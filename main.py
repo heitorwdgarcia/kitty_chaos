@@ -3,7 +3,7 @@ import pygame
 from settings import *
 from core import game_state as gs
 
-# systems TESTE DE COMMIT
+# systems TESTE DE COMMIT2
 from systems.enemies import move_enemies
 from systems.bullets import move_bullets
 from systems.collisions import bullet_enemy_collision, player_enemy_collision
