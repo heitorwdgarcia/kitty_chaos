@@ -1,0 +1,387 @@
+
+
+# GDD — CHAOS DODGE
+
+## Premissa
+
+Um herói improvável aparece para salvar cidades humanas.
+
+Esse herói é **Pituco**, um gato laranja armado.
+
+Ninguém sabe exatamente:
+
+* como ele fala
+* como ele usa armas
+* ou como ele salva cidades
+
+Mas ele continua tentando.
+
+---
+
+# Tom do jogo
+
+O jogo possui um tom:
+
+* humorístico
+* irônico
+* sarcástico
+
+O mundo reage às ações do jogador.
+
+Exemplos:
+
+* inimigos provocam o jogador
+* bosses lembram derrotas passadas
+* jornais comentam as tentativas do herói
+
+---
+
+# Fantasia do jogador
+
+O jogador vive a fantasia de ser:
+
+```
+um pequeno herói improvável
+tentando salvar uma cidade
+que não acredita nele
+```
+
+A cada run o jogador tenta provar que:
+
+```
+talvez esse gato realmente consiga salvar o mundo
+```
+
+---
+
+# Gameplay Pillars
+
+O jogo é baseado em quatro pilares.
+
+---
+
+## 1. Responsividade
+
+O jogo precisa ser:
+
+* rápido
+* preciso
+* fluido
+
+Movimento e tiros devem responder instantaneamente.
+
+---
+
+## 2. Caos controlado
+
+O jogo cria momentos de:
+
+* explosões
+* múltiplos inimigos
+* chain reactions
+
+Mas o jogador sempre deve sentir que:
+
+```
+tem controle da situação
+```
+
+---
+
+## 3. Near Miss Gameplay
+
+Grande parte da diversão vem de:
+
+```
+escapar por pouco
+```
+
+O jogo recompensa:
+
+* dodge preciso
+* posicionamento
+* risco
+
+---
+
+## 4. Humor sistêmico
+
+O mundo reage ao jogador.
+
+Isso acontece através de:
+
+* nemesis system
+* jornais pós run
+* provocações de inimigos
+
+---
+
+# Estrutura da Run
+
+Uma run dura aproximadamente:
+
+```
+5 minutos
+```
+
+Estrutura:
+
+```
+combat
+combat
+combat
+miniboss
+
+combat
+combat
+combat
+miniboss
+
+combat
+combat
+combat
+boss
+```
+
+---
+
+# Estágios de combate
+
+Cada estágio de combate dura aproximadamente:
+
+```
+30 segundos
+```
+
+Durante esses estágios:
+
+* inimigos aparecem
+* intensidade aumenta
+* jogador acumula kills
+
+---
+
+# Upgrades na run
+
+A run possui em média:
+
+```
+5 upgrades
+```
+
+Esses upgrades aparecem através de:
+
+```
+golden enemies
+```
+
+Golden enemies são inimigos especiais que:
+
+* aparecem durante o combate
+
+Quando derrotados:
+
+```
+spawnam um chest
+```
+
+Que oferece upgrades.
+
+---
+
+# Diretor de Run
+
+O **Run Director** controla:
+
+* spawn de inimigos
+* intensidade
+* momentos de recompensa
+* pacing da run
+
+Ele usa regras definidas em **Game Rules** para garantir que:
+
+* a run dure aproximadamente 5 minutos
+* o jogador receba upgrades em intervalos adequados
+* a dificuldade escale corretamente
+
+---
+
+# Miniboss
+
+Miniboss aparecem duas vezes por run.
+
+Função:
+
+* quebrar ritmo do combate
+* testar habilidade do jogador
+
+Miniboss podem dropar:
+
+* gems (menos que o boss)
+* ammo (menos que o boss)
+
+---
+
+# Boss
+
+O boss aparece no final da run.
+
+Ele representa o clímax da tentativa de salvar a cidade.
+
+Derrotar o boss pode recompensar o jogador com:
+
+* gems (mais que o miniboss)
+* ammo (mais que o miniboss)
+* progressão narrativa
+
+---
+
+# Sistema de cidades
+
+O jogo possui múltiplas cidades.
+
+Cada cidade possui:
+
+* inimigos próprios
+* boss próprio
+* identidade visual própria
+
+Completar uma cidade desbloqueia a próxima.
+
+---
+
+# Destruição da cidade
+
+Se o jogador falhar repetidamente:
+
+```
+world integrity pode chegar a zero
+```
+
+Quando isso acontece:
+
+```
+a cidade é destruída
+```
+
+E entra em:
+
+```
+reconstrução
+```
+
+Tempo de reconstrução:
+
+```
+~2 horas
+```
+
+O jogador pode acelerar reconstrução usando:
+
+* gems
+* anúncios
+
+---
+
+# Sistema Nemesis
+
+O jogo lembra das ações do jogador.
+
+Inimigos podem comentar:
+
+* armas usadas
+* derrotas passadas
+* comportamento do jogador
+
+Exemplos:
+
+```
+“Essa escopeta não funcionou antes.”
+“Você morreu aqui ontem.”
+```
+
+---
+
+# Jornal pós run
+
+Após cada run o jogo mostra um pequeno jornal.
+
+Ele comenta os eventos recentes.
+
+Exemplo:
+
+```
+Pituco tenta salvar a cidade novamente
+
+Autoridades afirmam que
+um gato armado pode não ser
+a solução ideal
+```
+
+---
+
+# Estilo visual
+
+O jogo usa um estilo:
+
+```
+cartoon arcade
+```
+
+Características:
+
+* formas simples
+* cores fortes
+* silhuetas claras
+* animações exageradas
+
+---
+
+# Perspectiva
+
+O jogo utiliza perspectiva:
+
+```
+vertical
+```
+
+Jogador na parte inferior da tela.
+
+Inimigos descem do topo.
+
+Isso favorece:
+
+* leitura clara
+* dodge gameplay
+* runs rápidas
+
+---
+
+# Armas
+
+Inicialmente o jogo usa armas humanas clássicas.
+
+Exemplos:
+
+```
+pistol
+shotgun
+smg
+laser
+```
+
+No futuro podem existir armas mais absurdas ou humorísticas.
+
+---
+
+# Meta progressão
+
+Entre runs o jogador pode:
+
+* desbloquear armas
+* comprar upgrades
+* acumular gemas
+
+Essas melhorias ajudam nas runs futuras.
+
+---

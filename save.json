@@ -1,0 +1,10 @@
+{
+    "gems": 750,
+    "weapons_unlocked": [
+        "pistol",
+        "shotgun",
+        "laser",
+        "smg"
+    ],
+    "upgrades_unlocked": []
+}

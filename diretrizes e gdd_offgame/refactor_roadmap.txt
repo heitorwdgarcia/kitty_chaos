@@ -1,0 +1,563 @@
+# REFATOR COMPLETO — PROJETO DODGE CHAOS
+
+Este chat será usado exclusivamente para realizar um **refactor técnico completo** no projeto **Dodge Chaos (Python + Pygame)**.
+
+O objetivo é corrigir:
+
+1. Bugs reais
+2. Código duplicado
+3. Arquivos não utilizados
+4. Sistemas legado
+5. Conflitos de autoridade
+6. Problemas de arquitetura
+7. Problemas técnicos detectados
+8. Problemas de performance
+9. Problemas de design técnico detectados no código
+
+Este refactor deve ser **seguro, sistemático e organizado por arquivo**.
+
+---
+
+# FORMA DE TRABALHO (OBRIGATÓRIO)
+
+Sempre seguir este fluxo:
+
+1. Analisar o arquivo
+2. Identificar impactos
+3. Aplicar correção
+4. Retornar **arquivo completo corrigido**
+
+Nunca retornar apenas trechos.
+
+Formato obrigatório:
+
+```
+Arquivo: caminho/arquivo.py
+
+Motivo da alteração
+
+Código completo corrigido
+```
+
+---
+
+# ORGANIZAÇÃO DAS CORREÇÕES
+
+As mudanças devem ser organizadas em:
+
+```
+Arquivos a deletar
+Arquivos a alterar
+Arquivos a revisar
+```
+
+---
+
+# ARQUIVOS A DELETAR
+
+Remover completamente:
+
+```
+meta/unlocks.py
+```
+
+Motivo:
+
+* arquivo vazio
+* não utilizado
+* legado de sistema antigo
+
+---
+
+# ARQUIVOS OPCIONAIS PARA REMOÇÃO
+
+Caso não estejam sendo utilizados:
+
+```
+entities/__init__.py
+systems/__init__.py
+```
+
+---
+
+# BUGS REAIS IDENTIFICADOS
+
+---
+
+# BUG 1 — LASER EXECUTANDO LÓGICA 3 VEZES
+
+Arquivo:
+
+```
+systems/laser.py
+```
+
+Problema:
+
+Blocos duplicados:
+
+```
+if gs.laser_charging
+if gs.laser_active
+```
+
+aparecem **3 vezes no arquivo**.
+
+Consequências:
+
+* timers decrementam múltiplas vezes
+* comportamento inconsistente
+* bugs de balanceamento
+
+Correção:
+
+Manter apenas **1 execução de cada bloco**.
+
+---
+
+# BUG 2 — ACCURACY DO MINIBOSS NÃO FUNCIONA
+
+Arquivo:
+
+```
+entities/miniboss.py
+```
+
+Função:
+
+```
+get_fight_stats()
+```
+
+Retorna:
+
+```
+accuracy = 0
+```
+
+Problema:
+
+```
+shots_taken nunca é atualizado
+```
+
+Resultado:
+
+```
+accuracy sempre 0
+```
+
+Correção:
+
+Adicionar:
+
+```
+shots_taken
+shots_hit
+```
+
+e calcular accuracy corretamente.
+
+---
+
+# BUG 3 — NEAR MISS NÃO REGISTRA NO MINIBOSS
+
+Arquivo:
+
+```
+systems/dodge.py
+```
+
+Problema:
+
+Near miss executa:
+
+```
+log_near_miss()
+```
+
+Mas não atualiza:
+
+```
+gs.miniboss.near_miss
+```
+
+Correção:
+
+Adicionar atualização do contador.
+
+---
+
+# BUG 4 — FAILSAFE INADEQUADO
+
+Arquivo:
+
+```
+main.py
+```
+
+Existe um failsafe:
+
+```
+stage_duration * 4
+```
+
+Problemas:
+
+* lógica de gameplay no main loop
+* dependência implícita de duração de evento
+* interfere em boss events
+
+Correção:
+
+Remover failsafe do `main.py`.
+
+Run termination deve ser responsabilidade do:
+
+```
+run_director
+```
+
+---
+
+# CÓDIGO DUPLICADO
+
+---
+
+# DUPLICIDADE 1 — LASER UPDATE
+
+Já descrito.
+
+---
+
+# DUPLICIDADE 2 — VARIÁVEIS NO WORLD
+
+Arquivo:
+
+```
+core/world.py
+```
+
+Variáveis duplicadas:
+
+```
+pickup_lifespan_mult
+pickup_size_mult
+double_pickups
+world_shield
+```
+
+Correção:
+
+Remover duplicação.
+
+---
+
+# SISTEMAS / ARQUIVOS NÃO UTILIZADOS
+
+---
+
+# LEGADO 1 — ELITE SYSTEM
+
+Arquivo:
+
+```
+entities/enemy.py
+```
+
+Existe variável:
+
+```
+self.is_elite = False
+```
+
+Mas sistema elite não existe mais.
+
+Correção:
+
+Remover variável.
+
+---
+
+# CONFLITOS DE AUTORIDADE
+
+---
+
+# AUTHORITY 1 — MORTE DE INIMIGOS
+
+Atualmente inimigos podem morrer por:
+
+```
+bullet_enemy_collision
+rage_system
+```
+
+Mas às vezes inimigos são removidos diretamente:
+
+```
+gs.enemies.remove(enemy)
+```
+
+Correção:
+
+A morte deve ocorrer **apenas via**:
+
+```
+kill_enemy()
+```
+
+---
+
+# AUTHORITY 2 — SPAWN
+
+Spawn ocorre em:
+
+```
+spawn.py
+run_events.py
+boss_logic.py
+```
+
+Correção:
+
+Centralizar spawn em:
+
+```
+systems/spawn.py
+```
+
+Outros sistemas devem **solicitar spawn**.
+
+---
+
+# AUTHORITY 3 — TERMINAÇÃO DE RUN
+
+A run termina em:
+
+```
+main.py
+run_director
+player_enemy_collision
+```
+
+Correção:
+
+Apenas:
+
+```
+run_director
+```
+
+deve finalizar runs.
+
+---
+
+# PROBLEMAS DE PERFORMANCE
+
+Arquivo:
+
+```
+systems/particles.py
+```
+
+Atual:
+
+```
+MAX_PARTICLES = 400
+```
+
+Correção:
+
+```
+MAX_PARTICLES = 200
+```
+
+---
+
+# PROBLEMAS DE GAME DESIGN DETECTADOS
+
+---
+
+# LASER ATRAVESSA BOSS INFINITAMENTE
+
+Código atual:
+
+```
+hits = 999
+```
+
+Correção:
+
+Adicionar limite de hits ou lógica de dano apropriada.
+
+---
+
+# BOSS HP MUITO BAIXO
+
+Boss atual:
+
+```
+hp = 5
+```
+
+Revisar balanceamento.
+
+---
+
+# COMBO SYSTEM PODE GERAR AMMO INFINITO
+
+Arquivo:
+
+```
+systems/combo.py
+```
+
+Combo reward pode gerar spam de ammo.
+
+Revisar lógica.
+
+---
+
+# MELHORIAS ADICIONAIS RECOMENDADAS
+
+Estas não são bugs, mas melhoram a arquitetura.
+
+---
+
+# MELHORIA 1 — SPAWN REQUEST SYSTEM
+
+Criar sistema onde eventos pedem spawn:
+
+```
+request_spawn(enemy_type)
+```
+
+E apenas `spawn.py` executa.
+
+---
+
+# MELHORIA 2 — ENEMY DEATH SAFETY
+
+Blindar `kill_enemy()` contra:
+
+```
+double removal
+```
+
+---
+
+# MELHORIA 3 — BOT MODE RULES
+
+Criar regras específicas para bot simulation:
+
+```
+bot_mode = True
+```
+
+para evitar travamentos.
+
+---
+
+# MELHORIA 4 — RUN DIRECTOR VARIATION
+
+Adicionar pequena variação no pacing para evitar runs idênticas.
+
+---
+
+# ORDEM DE EXECUÇÃO DO REFACTOR
+
+PASSO 1
+
+Corrigir:
+
+```
+systems/laser.py
+```
+
+---
+
+PASSO 2
+
+Remover legado:
+
+```
+meta/unlocks.py
+elite system
+```
+
+---
+
+PASSO 3
+
+Corrigir duplicações:
+
+```
+core/world.py
+```
+
+---
+
+PASSO 4
+
+Corrigir telemetria:
+
+```
+entities/miniboss.py
+systems/dodge.py
+```
+
+---
+
+PASSO 5
+
+Remover failsafe do main.
+
+---
+
+PASSO 6
+
+Centralizar spawn authority.
+
+---
+
+PASSO 7
+
+Ajustar performance.
+
+---
+
+# VALIDAÇÃO PÓS-REFACTOR
+
+Após finalizar:
+
+Executar:
+
+```
+10 bot runs
+```
+
+Verificar:
+
+```
+telemetry_runs.jsonl
+```
+
+Confirmar:
+
+* runs terminam corretamente
+* miniboss stats funcionam
+* nemesis stats funcionam
+* spawn continua correto
+
+---
+
+# OBJETIVO FINAL
+
+Após o refactor o projeto deve ter:
+
+* arquitetura mais limpa
+* autoridade de sistemas clara
+* telemetria funcional
+* código sem duplicações
+* legado removido
+* comportamento previsível

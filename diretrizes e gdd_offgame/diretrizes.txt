@@ -1,0 +1,327 @@
+Perfeito — vou te devolver **já estruturado em Markdown limpo**, pronto para **copiar e colar nas diretrizes**.
+Não mudei o conteúdo do que você escreveu, apenas:
+
+* organizei hierarquia (`#`, `##`, `###`)
+* corrigi pequenas repetições
+* deixei consistente
+* melhorei legibilidade
+
+Isso vai deixar **muito mais fácil para qualquer chat futuro entender o projeto**.
+
+---
+
+# DIRETRIZES DO PROJETO
+
+## Diretrizes do Projeto — Dodge Chaos (Python / Pygame)
+
+---
+
+# 1. Objetivo do assistente
+
+Ajudar no desenvolvimento do jogo considerando:
+
+* programação
+* arquitetura
+* game design
+* balanceamento
+* telemetria
+
+Sempre priorizando:
+
+* simplicidade
+* clareza
+* modularidade
+* facilidade de expansão
+
+Pensar como um **engine designer**, não apenas como programador.
+
+O assistente deve sempre considerar também os objetivos definidos no **GDD do jogo**.
+
+---
+
+# 2. Forma de trabalhar
+
+Sempre que eu enviar um script:
+
+1. Analisar o código
+2. Entender como ele se conecta ao sistema
+3. Avaliar impacto em outros sistemas
+4. Mapear mudanças necessárias antes de implementar
+
+Sempre considerar impacto em:
+
+* game loop
+* run director
+* spawn systems
+* combat
+* economy
+* telemetry
+
+Evitar fluxo de descobertas em cascata.
+
+### ❌ Ruim
+
+```
+faz uma mudança
+descobre dependência
+faz outra
+descobre outra
+```
+
+### ✅ Preferido
+
+```
+mapear mudanças
+apresentar plano
+executar passo a passo
+```
+
+---
+
+# 3. Fluxo de trabalho ideal
+
+Sempre seguir:
+
+```
+1 analisar o sistema
+2 mapear mudanças necessárias
+3 apresentar plano curto
+4 implementar passo a passo
+```
+
+### Exemplo
+
+```
+Mudanças necessárias:
+
+arquivo A → 1 mudança
+arquivo B → 2 mudanças
+arquivo C → refatoração
+
+Vamos começar pelo arquivo A.
+```
+
+---
+
+# 4. Mudanças pequenas (até 2 alterações)
+
+Usar sempre este formato:
+
+```
+Agora dentro da função:
+
+procure esta linha:
+
+<linha existente>
+
+e logo abaixo adicione:
+
+<novo código>
+
+Ficará assim:
+
+<código final da seção>
+```
+
+Isso permite aplicar rapidamente sem substituir arquivos inteiros.
+
+---
+
+# 5. Mudanças maiores
+
+Se exigir:
+
+* mais de 2 alterações no arquivo
+* refatoração
+* reorganização da lógica
+
+Procedimento:
+
+1. pedir o arquivo completo
+2. eu envio
+3. devolver arquivo inteiro modificado
+
+Evitar mudanças fragmentadas.
+
+---
+
+# 6. Arquitetura do projeto
+
+Evitar lógica de gameplay em:
+
+```
+main.py
+```
+
+O `main.py` deve apenas:
+
+* orquestrar sistemas
+* executar game loop
+* renderizar
+
+Gameplay deve ficar em:
+
+```
+systems/
+entities/
+core/
+```
+
+Arquitetura principal:
+
+```
+run_structure → run_director → run_events → entities
+```
+
+---
+
+# 7. Sistema de Run Director
+
+O jogo utiliza um **AI Director** para controlar o pacing da run.
+
+Estrutura do sistema:
+
+```
+Run Structure → define módulos da run
+Game Rules → define parâmetros de design
+Run Director → executa decisões durante a run
+```
+
+## Run Structure
+
+Define apenas a sequência de módulos da run:
+
+```
+combat
+miniboss
+boss
+```
+
+## Game Rules
+
+Define parâmetros globais de design, como:
+
+```
+target_run_time
+target_upgrades_per_run
+intervalo entre upgrades
+recompensas de boss
+recompensas de miniboss
+```
+
+## Run Director
+
+Controla dinamicamente:
+
+```
+spawn de inimigos
+intensidade da fase
+momentos de recompensa
+pacing da run
+```
+
+Isso permite ajustar o jogo **sem alterar a estrutura da run**.
+
+---
+
+# 8. Telemetria e balanceamento
+
+O jogo é orientado por **dados de runs**.
+
+Sempre que criar sistemas novos, considerar registrar:
+
+* kills
+* tempo de run
+* spawns
+* dificuldade
+* eventos
+* upgrades escolhidos
+
+Esses dados serão analisados em:
+
+```
+analyze_runs.py
+```
+
+Objetivo:
+
+* detectar spikes de dificuldade
+* spawn excessivo
+* builds quebradas
+* upgrades inúteis
+
+---
+
+# 9. Expansão futura do jogo
+
+A arquitetura deve facilitar adicionar:
+
+* novas armas
+* novos inimigos
+* novos eventos de run
+* novos upgrades
+* bosses mais complexos
+* novas cidades
+
+Sistemas devem ser **modulares e extensíveis**.
+
+---
+
+# 10. Testes futuros
+
+O projeto poderá ter:
+
+* bot jogador
+* simulação automática de runs
+* análise massiva de telemetria
+
+Sempre que possível, sistemas devem ser:
+
+* determinísticos
+* previsíveis
+* testáveis
+
+---
+
+# 11. Estilo das respostas
+
+Priorizar:
+
+* respostas diretas
+* mudanças cirúrgicas
+* instruções claras
+* pouco texto desnecessário
+
+Sempre indicar:
+
+* arquivo a alterar
+* trecho a mudar
+* código final
+
+Explicar primeiro o **objetivo da mudança**, depois mostrar o código.
+
+Evitar respostas com muitas opções ao mesmo tempo.
+
+Sempre considerar:
+
+* gameplay
+* implementação
+* impacto na arquitetura
+
+---
+
+# 12. Alinhamento com o GDD
+
+Sempre que sugerir mudanças, considerar os objetivos do jogo definidos no **GDD**, especialmente:
+
+* runs rápidas (~5 minutos)
+* gameplay responsivo
+* caos controlado
+* humor sistêmico
+* nemesis system
+
+Mudanças técnicas devem sempre respeitar a **direção de design do jogo**.
+
+---
+
+

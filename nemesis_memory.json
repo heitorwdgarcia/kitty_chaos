@@ -1,0 +1,22 @@
+{
+    "default": {
+        "encounters": 1,
+        "avg_accuracy": 0.0,
+        "avg_near_miss": 0.0
+    },
+    "hunter": {
+        "encounters": 588,
+        "avg_accuracy": 0.0,
+        "avg_near_miss": 0.0004892353899776936
+    },
+    "wander": {
+        "encounters": 1,
+        "avg_accuracy": 0.0,
+        "avg_near_miss": 0.0
+    },
+    "top_guard": {
+        "encounters": 2,
+        "avg_accuracy": 0.0,
+        "avg_near_miss": 0.0
+    }
+}
