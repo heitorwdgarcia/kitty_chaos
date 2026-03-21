@@ -5,9 +5,9 @@
         "avg_near_miss": 0.0
     },
     "hunter": {
-        "encounters": 588,
+        "encounters": 602,
         "avg_accuracy": 0.0,
-        "avg_near_miss": 0.0004892353899776936
+        "avg_near_miss": 0.0002441704855584703
     },
     "wander": {
         "encounters": 1,

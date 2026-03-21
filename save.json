@@ -1,10 +1,12 @@
 {
-    "gems": 750,
+    "gems": 780,
     "weapons_unlocked": [
         "pistol",
         "shotgun",
         "laser",
         "smg"
     ],
-    "upgrades_unlocked": []
+    "upgrades_unlocked": [
+        "rage_core"
+    ]
 }

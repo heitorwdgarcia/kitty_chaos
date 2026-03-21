@@ -254,6 +254,8 @@ def get_run_context():
 # =========================================================
 
 def update_run_director():
+    from systems.run_logger import log_stage_tick
+    log_stage_tick()
 
     global current_index
     global stage_timer

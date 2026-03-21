@@ -1,6 +1,6 @@
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\analize_runs.py
+./analize_runs.py
 ================================================================================
 
 import json
@@ -288,12 +288,12 @@ if __name__ == "__main__":
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\dump_scripts.py
+./dump_scripts.py
 ================================================================================
 
 import os
 
-ROOT_FOLDER = r"C:\Users\heito\Documents\Programação\chaos_dodge - v2"
+ROOT_FOLDER = "."
 OUTPUT_FILE = "todos_scripts_dump.txt"
 
 IGNORE_FOLDERS = {
@@ -349,41 +349,24 @@ if __name__ == "__main__":
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\main.py
+./main.py
 ================================================================================
 
 import pygame
 
 from settings import *
 from core import game_state as gs
+from core.input_handler import handle_input
+from core import game
+from core.renderer import render
 
-# systems
-from systems.enemies import move_enemies
-from systems.bullets import move_bullets
-from systems.collisions import bullet_enemy_collision, player_enemy_collision
-from systems.particles import update_particles
-from systems.pickups import update_pickups
-from systems.combo import update_combo
-from systems.dodge import update_dodge
-from systems.laser import update_laser
-from systems.camera import update_camera, get_camera_offset
-from systems.player_movement import update_player
-from systems.player_combat import handle_shooting
-from systems.boss_logic import update_boss
-from systems.run_director import update_run_director
-from systems.world_integrity import update_world_integrity
-from systems.run_logger import start_run as telemetry_start_run, end_run
-from systems.bot_manager import update_bot_manager
+from systems.run_initializer import start_run
 
-# reward system
-from meta.rewards import reward_gems
-
-# UI
-from ui import init_ui, draw_ui, draw_entities, draw_messages
-from ui.ui import get_font
-from ui.main_menu import draw_main_menu, update_menu_input
-from ui.shop_menu import draw_shop, update_shop_input
-from ui.weapon_select import draw_weapon_select, update_weapon_select_input
+# UI (somente telas principais)
+from ui import init_ui
+from ui.main_menu import draw_main_menu
+from ui.shop_menu import draw_shop
+from ui.weapon_select import draw_weapon_select
 
 
 pygame.init()
@@ -396,213 +379,26 @@ clock = pygame.time.Clock()
 
 running = True
 
-
-# =========================================================
-# START RUN
-# =========================================================
-
-def start_run():
-
-    telemetry_start_run()
-
-    from systems.nemesis_system import start_run as nemesis_start
-    nemesis_start()
-
-    import systems.run_director as run_director
-    run_director.start_run()
-
-    gs.run_timer = 0
-
-    gs.kills = 0
-    gs.chaos = 0
-    gs.combo = 0
-    gs.combo_timer = 0
-
-    gs.enemies.clear()
-    gs.bullets.clear()
-    gs.particles.clear()
-    gs.pickups.clear()
-
-    gs.boss = None
-    gs.miniboss = None
-
-    gs.player_x = WIDTH // 2
-    gs.player_y = HEIGHT - 120
-
-    gs.player_hp = gs.player_max_hp
-    gs.player_iframes = 0
-    gs.ammo = max(1, gs.max_ammo)
-
-    gs.fire_rate_mult = 1.0
-    gs.double_shot = False
-    gs.extra_pierce = 0
-
-    gs.upgrades_taken = []
-
-    gs.player_upgrades = []
-    gs.build_tags = set()
-
-    gs.rage_level = 0
-    gs.rage_radius = 0
-    gs.rage_damage = 0
-    gs.rage_ammo = False
-    gs.rage_chain = False
-
-    gs.ammo_starve_timer = 0
-
-    if hasattr(gs, "world_critical_warning"):
-        del gs.world_critical_warning
-
-    gs.spawn_timer = 0
-    gs.shoot_timer = 0
-
-    gs.world_integrity = gs.max_world_integrity
-
-    gs.reward_active = False
-    gs.reward_choices = []
-
-    if gs.bot_mode:
-        gs.weapon = "pistol"
-        gs.game_state = "run"
-    else:
-        gs.game_state = "weapon_select"
-
-
-# =========================================================
-# RUN REWARD
-# =========================================================
-
-def give_run_reward():
-
-    gems = 1
-    gems += gs.kills // 25
-
-    reward_gems(gems)
-
-
-# =========================================================
-# UPDATE GAME
-# =========================================================
-
-def update_game(keys):
-
-    if gs.reward_active:
-        return
-
-    gs.run_timer += 1
-
-    from systems.run_logger import log_stage_tick
-    log_stage_tick()
-
-    if gs.player_iframes > 0:
-        gs.player_iframes -= 1
-
-    update_run_director()
-
-    update_boss()
-
-    if gs.miniboss:
-        gs.miniboss.update()
-
-    update_world_integrity()
-
-    update_player()
-    handle_shooting(keys)
-
-    update_laser()
-
-    move_enemies()
-    move_bullets()
-
-    bullet_enemy_collision()
-
-    if player_enemy_collision():
-
-        give_run_reward()
-        end_run("enemy_collision")
-
-        from systems.nemesis_system import finalize_run
-        finalize_run()
-
-        gs.game_state = "result"
-        return
-
-    update_dodge()
-
-    if gs.world_integrity <= 0:
-
-        give_run_reward()
-        end_run("world_destroyed")
-
-        from systems.nemesis_system import finalize_run
-        finalize_run()
-
-        gs.game_state = "result"
-        return
-
-    update_combo()
-
-    update_particles()
-    update_pickups()
-
-    update_camera()
-
-
-# =========================================================
-# RENDER GAME
-# =========================================================
-
-def render_game():
-
-    shake_x, shake_y = get_camera_offset()
-
-    screen.fill((15, 15, 20))
-
-    draw_entities(screen, shake_x, shake_y)
-
-    draw_messages(screen)
-
-    draw_ui(screen)
-
-
-# =========================================================
-# RESULT SCREEN
-# =========================================================
-
-def render_result():
-
-    screen.fill((10,10,15))
-
-    font = get_font()
-
-    text = font.render("RUN OVER", True, (255,255,255))
-    kills = font.render(f"KILLS: {gs.kills}", True, (200,200,200))
-    restart = font.render("PRESS SPACE", True, (160,160,160))
-
-    screen.blit(text, (WIDTH//2 - text.get_width()//2, 250))
-    screen.blit(kills, (WIDTH//2 - kills.get_width()//2, 300))
-    screen.blit(restart, (WIDTH//2 - restart.get_width()//2, 350))
-
-
 # =========================================================
 # MAIN LOOP
 # =========================================================
 
 while running:
 
+    # -------------------------------------------------
+    # CLOCK
+    # -------------------------------------------------
+
     if gs.bot_mode:
         clock.tick(1200)
     else:
         clock.tick(60)
 
+    # -------------------------------------------------
+    # INPUT
+    # -------------------------------------------------
+
     keys = pygame.key.get_pressed()
-
-    if gs.reward_active and gs.bot_mode:
-
-        from systems.reward_system import choose_reward
-
-        if gs.reward_choices:
-            choose_reward(0)
 
     for event in pygame.event.get():
 
@@ -610,94 +406,29 @@ while running:
             pygame.quit()
             exit()
 
-        if event.type == pygame.KEYDOWN:
+        handle_input(event, start_run)
 
-            # -------------------------------------------------
-            # ESCOLHER BOT
-            # -------------------------------------------------
+    # -------------------------------------------------
+    # UPDATE
+    # -------------------------------------------------
 
-            if event.key == pygame.K_F1:
-                gs.bot_type = "beginner"
+    state = game.update(keys)
 
-            if event.key == pygame.K_F2:
-                gs.bot_type = "intermediate"
+    # -------------------------------------------------
+    # HIT STOP
+    # -------------------------------------------------
 
-            if event.key == pygame.K_F3:
-                gs.bot_type = "advanced"
-
-            # -------------------------------------------------
-            # ESCOLHER QUANTIDADE DE RUNS
-            # -------------------------------------------------
-
-            if event.key == pygame.K_F9:
-
-                if gs.bot_type:
-                    gs.bot_mode = True
-                    gs.bot_runs_remaining = 1
-                    start_run()
-
-            if event.key == pygame.K_F10:
-
-                if gs.bot_type:
-                    gs.bot_mode = True
-                    gs.bot_runs_remaining = 10
-                    start_run()
-
-            if event.key == pygame.K_F11:
-
-                if gs.bot_type:
-                    gs.bot_mode = True
-                    gs.bot_runs_remaining = 100
-                    start_run()
-
-            if gs.reward_active:
-
-                if event.key in (pygame.K_1, pygame.K_2, pygame.K_3):
-
-                    from systems.reward_system import choose_reward
-
-                    index = event.key - pygame.K_1
-
-                    if index < len(gs.reward_choices):
-                        choose_reward(index)
-
-            elif gs.game_state == "menu":
-                update_menu_input(event)
-
-            elif gs.game_state == "shop":
-                update_shop_input(event)
-
-            elif gs.game_state == "weapon_select":
-                update_weapon_select_input(event)
-
-            elif gs.game_state == "result":
-
-                if event.key == pygame.K_SPACE:
-                    gs.game_state = "menu"
-
-    if gs.start_requested:
-
-        gs.start_requested = False
-        start_run()
-
-    if gs.hit_stop > 0:
-
-        gs.hit_stop -= 1
+    if state == "hit_stop":
 
         if gs.game_state == "run":
-            render_game()
+            render(screen)
 
         pygame.display.update()
         continue
 
-    # UPDATE
-
-    if gs.game_state == "run":
-        update_game(keys)
-
-    update_bot_manager(start_run)
-
+    # -------------------------------------------------
     # RENDER
+    # -------------------------------------------------
 
     if gs.game_state == "menu":
         draw_main_menu(screen)
@@ -708,11 +439,8 @@ while running:
     elif gs.game_state == "weapon_select":
         draw_weapon_select(screen)
 
-    elif gs.game_state == "run":
-        render_game()
-
-    elif gs.game_state == "result":
-        render_result()
+    else:
+        render(screen)
 
     pygame.display.update()
 
@@ -721,7 +449,7 @@ pygame.quit()
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\settings.py
+./settings.py
 ================================================================================
 
 WIDTH = 600
@@ -745,7 +473,979 @@ DEBUG_ENEMY_SPEED = 1.5
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\core\game_state.py
+./ui/__init__.py
+================================================================================
+
+from .ui import init_ui
+from .hud import draw_ui
+from .messages import spawn_message
+from .render import draw_entities
+from .messages import draw_messages
+
+
+================================================================================
+./ui/hud.py
+================================================================================
+
+import pygame
+from core import game_state as gs
+from .ui import get_font
+from settings import *
+
+import systems.run_director as run_director
+
+
+def draw_ui(screen):
+
+    font = get_font()
+
+    # -------------------------------------------------
+    # PLAYER INFO
+    # -------------------------------------------------
+
+    screen.blit(
+        font.render(f"Kills: {gs.kills}", True, (255,255,255)),
+        (10,10)
+    )
+
+    screen.blit(
+        font.render(f"Ammo: {gs.ammo}/{gs.max_ammo}", True, (255,255,255)),
+        (10,40)
+    )
+
+    screen.blit(
+        font.render(f"Weapon: {gs.weapon}", True, (255,255,255)),
+        (10,70)
+    )
+
+    screen.blit(
+        font.render(f"HP: {gs.player_hp}", True, (255,120,120)),
+        (10,100)
+    )
+
+    # -------------------------------------------------
+    # RUN TIMER
+    # -------------------------------------------------
+
+    minutes = gs.run_timer // 3600
+    seconds = (gs.run_timer % 3600) // 60
+
+    timer_text = f"{minutes}:{seconds:02d}"
+
+    timer_surface = font.render(timer_text, True, (255,255,255))
+
+    screen.blit(
+        timer_surface,
+        (WIDTH//2 - timer_surface.get_width()//2, 10)
+    )
+
+
+    # -------------------------------------------------
+    # STAGE
+    # -------------------------------------------------
+
+    phase_surface = font.render(
+        f"Stage {run_director.current_index + 1}",
+        True,
+        (180,180,180)
+    )
+
+    screen.blit(
+        phase_surface,
+        (WIDTH//2 - phase_surface.get_width()//2, 40)
+    )
+
+
+    # -------------------------------------------------
+    # INTENSITY DEBUG
+    # -------------------------------------------------
+
+    intensity = run_director.get_intensity()
+
+    intensity_text = font.render(
+        f"Intensity: {int(intensity*100)}%",
+        True,
+        (200,200,120)
+    )
+
+    screen.blit(intensity_text, (10,130))
+
+
+    # -------------------------------------------------
+    # BOT MODE INFO
+    # -------------------------------------------------
+
+    if gs.bot_mode:
+
+        bot_text = font.render(
+            f"BOT RUNS LEFT: {gs.bot_runs_remaining}",
+            True,
+            (120,200,255)
+        )
+
+        screen.blit(
+            bot_text,
+            (WIDTH - bot_text.get_width() - 20, 10)
+        )
+
+
+    # -------------------------------------------------
+    # BOSS HP BAR
+    # -------------------------------------------------
+
+    if gs.boss:
+
+        bar_w = 320
+        bar_h = 18
+
+        x = WIDTH // 2 - bar_w // 2
+        y = 70
+
+        ratio = gs.boss.hp / gs.boss.max_hp if gs.boss.max_hp else 0
+        ratio = max(0, min(1, ratio))
+
+        pygame.draw.rect(screen, (60,0,0), (x,y,bar_w,bar_h))
+        pygame.draw.rect(screen, (255,60,60), (x,y,int(bar_w*ratio),bar_h))
+        pygame.draw.rect(screen, (255,255,255), (x,y,bar_w,bar_h), 2)
+
+
+    # -------------------------------------------------
+    # WORLD INTEGRITY BAR
+    # -------------------------------------------------
+
+    bar_w = 200
+    bar_h = 14
+
+    x = WIDTH - bar_w - 20
+    y = HEIGHT - 40
+
+    ratio = max(
+        0,
+        min(1, gs.world_integrity / gs.max_world_integrity)
+    )
+
+    pygame.draw.rect(screen, (40,40,40), (x,y,bar_w,bar_h))
+    pygame.draw.rect(screen, (80,220,120), (x,y,int(bar_w * ratio),bar_h))
+    pygame.draw.rect(screen, (255,255,255), (x,y,bar_w,bar_h), 2)
+
+    label = font.render("WORLD", True, (255,255,255))
+
+    screen.blit(label, (x - label.get_width() - 10, y - 4))
+
+
+    # -------------------------------------------------
+    # REWARD SCREEN
+    # -------------------------------------------------
+
+    if gs.reward_active:
+
+        big_font = pygame.font.SysFont(None, 42)
+
+        title = big_font.render("CHOOSE UPGRADE", True, (255,255,255))
+
+        screen.blit(
+            title,
+            (WIDTH//2 - title.get_width()//2, 200)
+        )
+
+        y = 300
+
+        for i, upgrade in enumerate(gs.reward_choices):
+
+            text = f"{i+1} - {format_upgrade(upgrade)}"
+
+            surf = font.render(text, True, (255,255,120))
+
+            screen.blit(
+                surf,
+                (WIDTH//2 - surf.get_width()//2, y)
+            )
+
+            y += 50
+
+        info = font.render("PRESS 1 / 2 / 3", True, (200,200,200))
+
+        screen.blit(
+            info,
+            (WIDTH//2 - info.get_width()//2, y + 20)
+        )
+
+
+# -------------------------------------------------
+# FORMAT UPGRADE TEXT
+# -------------------------------------------------
+
+def format_upgrade(up):
+
+    names = {
+
+        "fire_rate": "Faster Fire Rate",
+
+        "double_shot": "Double Shot",
+
+        "pierce": "Bullet Pierce",
+
+        "ammo_cap": "Increase Ammo",
+
+        "hp": "Extra HP"
+
+    }
+
+    return names.get(up, up)
+
+
+================================================================================
+./ui/main_menu.py
+================================================================================
+
+import pygame
+
+from ui.ui import get_font
+from core import game_state as gs
+
+
+selected = 0
+
+options = [
+    "START RUN",
+    "SHOP",
+    "QUIT"
+]
+
+
+def update_menu_input(event):
+
+    global selected
+
+    if event.key == pygame.K_UP:
+        selected = max(0, selected-1)
+
+    elif event.key == pygame.K_DOWN:
+        selected = min(len(options)-1, selected+1)
+
+    elif event.key == pygame.K_RETURN:
+
+        if options[selected] == "START RUN":
+            gs.start_requested = True
+
+        elif options[selected] == "SHOP":
+            gs.game_state = "shop"
+
+        elif options[selected] == "QUIT":
+            pygame.quit()
+            exit()
+
+
+def draw_main_menu(screen):
+
+    font = get_font()
+
+    screen.fill((10,10,15))
+
+    title = font.render("CHAOS DODGE", True, (255,255,255))
+
+    screen.blit(title, (200,120))
+
+    # -------------------------------------------------
+    # BOT DEBUG INFO
+    # -------------------------------------------------
+    font_small = get_font()
+
+    y_bot = 420
+
+    screen.blit(
+        font_small.render("BOT TEST MODE", True, (120,200,255)),
+        (20, y_bot)
+    )
+
+    y_bot += 30
+
+    screen.blit(
+        font_small.render("F1 Beginner", True, (200,200,200)),
+        (20, y_bot)
+    )
+
+    y_bot += 25
+
+    screen.blit(
+        font_small.render("F2 Intermediate", True, (200,200,200)),
+        (20, y_bot)
+    )
+
+    y_bot += 25
+
+    screen.blit(
+        font_small.render("F3 Advanced", True, (200,200,200)),
+        (20, y_bot)
+    )
+
+    y_bot += 30
+
+    screen.blit(
+        font_small.render("F9  → 1 Run", True, (200,200,200)),
+        (20, y_bot)
+    )
+
+    y_bot += 25
+
+    screen.blit(
+        font_small.render("F10 → 10 Runs", True, (200,200,200)),
+        (20, y_bot)
+    )
+
+    y_bot += 25
+
+    screen.blit(
+        font_small.render("F11 → 100 Runs", True, (200,200,200)),
+        (20, y_bot)
+    )
+
+    y_bot += 30
+
+    bot_name = getattr(gs, "bot_type", None)
+
+    if bot_name:
+        text = f"CURRENT BOT: {bot_name.upper()}"
+    else:
+        text = "CURRENT BOT: NONE"
+
+    screen.blit(
+        font_small.render(text, True, (255,255,120)),
+        (20, y_bot)
+    )
+
+
+
+    y = 260
+
+    for i, option in enumerate(options):
+
+        color = (200,200,200)
+
+        if i == selected:
+            color = (255,255,120)
+
+        surf = font.render(option, True, color)
+
+        screen.blit(surf, (240,y))
+
+        y += 60
+
+
+================================================================================
+./ui/messages.py
+================================================================================
+
+import random
+import pygame
+from core import game_state as gs
+from .ui import get_font
+
+
+def spawn_message(text, x, y, color):
+
+    # -------------------------------------------------
+    # COMBO MESSAGE UPDATE (não criar várias)
+    # -------------------------------------------------
+
+    if text.startswith("COMBO"):
+
+        for msg in gs.messages:
+
+            if msg[0].startswith("COMBO"):
+
+                msg[0] = text
+                msg[1] = 60
+                return
+
+    # -------------------------------------------------
+    # NOVA MENSAGEM
+    # -------------------------------------------------
+
+    offset_x = random.randint(-20, 20)
+
+    stack_offset = len(gs.messages) * 18
+
+    gs.messages.append([
+        text,                # 0 text
+        60,                  # 1 life
+        x + offset_x,        # 2 x
+        y - stack_offset,    # 3 y
+        color                # 4 color
+    ])
+
+
+def draw_messages(screen):
+
+    font = get_font()
+
+    for msg in gs.messages[:]:
+
+        text = msg[0]
+        life = msg[1]
+        x = msg[2]
+        y = msg[3]
+        color = msg[4]
+
+        surf = font.render(text, True, color)
+
+        # -------------------------------------------------
+        # FADE
+        # -------------------------------------------------
+
+        alpha = int(255 * (life / 60))
+        surf.set_alpha(alpha)
+
+        screen.blit(surf, (x, y))
+
+        # -------------------------------------------------
+        # ANIMAÇÃO
+        # -------------------------------------------------
+
+        msg[1] -= 1
+        msg[3] -= 0.4
+
+        if msg[1] <= 0:
+            gs.messages.remove(msg)
+
+
+================================================================================
+./ui/render.py
+================================================================================
+
+import pygame
+import math
+from core import game_state as gs
+from settings import *
+from entities.enemy import TankEnemy, ZigZagEnemy
+
+
+def draw_entities(screen, offset_x=0, offset_y=0):
+
+    # PLAYER
+
+    pygame.draw.rect(
+        screen,
+        (80,160,255),
+        (
+            gs.player_x + offset_x,
+            gs.player_y + offset_y,
+            PLAYER_W,
+            PLAYER_H
+        )
+    )
+
+    # BULLETS
+
+    for b in gs.bullets:
+
+        pygame.draw.rect(
+            screen,
+            (255,230,50),
+            (
+                b.x + offset_x,
+                b.y + offset_y,
+                BULLET_W,
+                BULLET_H
+            )
+        )
+
+    # ENEMIES
+
+    for e in gs.enemies:
+
+        color = (220,60,60)
+
+        if isinstance(e, TankEnemy):
+            color = (60,160,60)
+
+        elif isinstance(e, ZigZagEnemy):
+            color = (200,60,255)
+
+        w = ENEMY_W
+        h = ENEMY_H
+
+        if getattr(e, "is_golden", False):
+
+            # -------------------------------------------------
+            # PULSE EFFECT (FIXED)
+            # -------------------------------------------------
+
+            phase = getattr(e, "golden_phase", 0)
+
+            # 🔥 FIX DO CRASH
+            if not isinstance(phase, (int, float)):
+                phase = 0.0
+
+            pulse = math.sin(phase) * 0.05
+
+            scale = getattr(e, "golden_scale", 1.2) + pulse
+
+            w = int(ENEMY_W * scale)
+            h = int(ENEMY_H * scale)
+
+            # -------------------------------------------------
+            # FLASH IF INVULNERABLE
+            # -------------------------------------------------
+
+            if getattr(e, "golden_invulnerable", False):
+
+                if int(phase * 6) % 2 == 0:
+                    color = (255,255,200)
+                else:
+                    color = (255,210,80)
+
+            else:
+                color = (255,210,80)
+
+        pygame.draw.rect(
+            screen,
+            color,
+            (
+                e.x + offset_x - (w - ENEMY_W)//2,
+                e.y + offset_y - (h - ENEMY_H)//2,
+                w,
+                h
+            )
+        )
+
+        # -------------------------------------------------
+        # GOLDEN OUTLINE
+        # -------------------------------------------------
+
+        if getattr(e, "is_golden", False):
+
+            pygame.draw.rect(
+                screen,
+                (255,255,200),
+                (
+                    e.x + offset_x - (w - ENEMY_W)//2 - 2,
+                    e.y + offset_y - (h - ENEMY_H)//2 - 2,
+                    w + 4,
+                    h + 4
+                ),
+                2
+            )
+
+    # MINIBOSS
+
+    if gs.miniboss:
+
+        pygame.draw.rect(
+            screen,
+            (255,140,60),
+            (
+                gs.miniboss.x + offset_x,
+                gs.miniboss.y + offset_y,
+                gs.miniboss.width,
+                gs.miniboss.height
+            )
+        )
+
+    # BOSS
+
+    if gs.boss:
+
+        pygame.draw.rect(
+            screen,
+            (255,80,120),
+            (
+                gs.boss.x + offset_x,
+                gs.boss.y + offset_y,
+                80,
+                60
+            )
+        )
+
+    # LASER CHARGE
+
+    if gs.laser_charging:
+
+        px = gs.player_x + PLAYER_W // 2 + offset_x
+        py = gs.player_y + offset_y
+
+        pygame.draw.circle(screen, (80,200,255), (px,py), 6)
+        pygame.draw.circle(screen, (150,255,255), (px,py), 10, 2)
+
+    # LASER
+
+    if gs.laser_active:
+
+        lx = gs.laser_x + offset_x
+        top = gs.player_y - gs.laser_length + offset_y
+
+        pygame.draw.line(
+            screen,
+            (100,255,255),
+            (lx, gs.player_y + offset_y),
+            (lx, top),
+            5
+        )
+
+    # PICKUPS
+
+    for p in gs.pickups:
+
+        x = p.x + offset_x
+        y = p.y + offset_y
+
+        if p.kind == "ammo":
+
+            pygame.draw.rect(
+                screen,
+                (80,180,255),
+                (x, y, 16, 16)
+            )
+
+        elif p.kind == "gem":
+
+            pygame.draw.circle(
+                screen,
+                (220,40,40),
+                (int(x + 5), int(y + 5)),
+                5
+            )
+
+        else:
+
+            pygame.draw.rect(
+                screen,
+                (80,255,120),
+                (x, y, 14, 14)
+            )
+
+    # PARTICLES
+
+    for p in gs.particles:
+
+        pygame.draw.circle(
+            screen,
+            (255,200,50),
+            (
+                int(p.x + offset_x),
+                int(p.y + offset_y)
+            ),
+            2
+        )
+
+
+================================================================================
+./ui/shop_menu.py
+================================================================================
+
+import pygame
+
+from ui.ui import get_font
+from meta.shop import (
+    WEAPON_ITEMS,
+    UPGRADE_ITEMS,
+    buy_weapon,
+    buy_upgrade,
+    get_player_gems,
+    get_unlocked_weapons,
+    get_unlocked_upgrades
+)
+
+from core import game_state as gs
+
+
+selected_index = 0
+
+
+def update_shop_input(event):
+
+    global selected_index
+
+    items = list(WEAPON_ITEMS.keys()) + list(UPGRADE_ITEMS.keys())
+
+    if event.key == pygame.K_UP:
+        selected_index = max(0, selected_index - 1)
+
+    elif event.key == pygame.K_DOWN:
+        selected_index = min(len(items)-1, selected_index + 1)
+
+    elif event.key == pygame.K_RETURN:
+
+        item = items[selected_index]
+
+        if item in WEAPON_ITEMS:
+            buy_weapon(item)
+
+        elif item in UPGRADE_ITEMS:
+            buy_upgrade(item)
+
+    elif event.key == pygame.K_ESCAPE:
+
+        gs.game_state = "menu"
+
+
+def draw_shop(screen):
+
+    font = get_font()
+
+    screen.fill((10,10,15))
+
+    title = font.render("SHOP", True, (255,255,255))
+    screen.blit(title, (260,100))
+
+    gems = get_player_gems()
+    gem_text = font.render(f"GEMS: {gems}", True, (180,180,255))
+    screen.blit(gem_text, (250,140))
+
+    unlocked_weapons = get_unlocked_weapons()
+    unlocked_upgrades = get_unlocked_upgrades()
+
+    items = list(WEAPON_ITEMS.items()) + list(UPGRADE_ITEMS.items())
+
+    y = 220
+
+    for i, (item, price) in enumerate(items):
+
+        color = (200,200,200)
+
+        if i == selected_index:
+            color = (255,255,120)
+
+        text = f"{item.upper()} - {price} gems"
+
+        if item in unlocked_weapons or item in unlocked_upgrades:
+            text += " (OWNED)"
+
+        surf = font.render(text, True, color)
+
+        screen.blit(surf, (160,y))
+
+        y += 40
+
+    info = font.render("ENTER BUY | ESC BACK", True, (150,150,150))
+    screen.blit(info, (170, y + 20))
+
+
+================================================================================
+./ui/ui.py
+================================================================================
+
+import pygame
+
+font = None
+
+
+def init_ui():
+    global font
+    font = pygame.font.SysFont(None, 36)
+
+
+def get_font():
+    return font
+
+
+================================================================================
+./ui/weapon_select.py
+================================================================================
+
+import pygame
+
+from core import game_state as gs
+from ui.ui import get_font
+from meta.shop import get_unlocked_weapons
+
+
+selected = 0
+
+
+def update_weapon_select_input(event):
+
+    global selected
+
+    weapons = get_unlocked_weapons()
+
+    if event.key == pygame.K_UP:
+        selected = max(0, selected - 1)
+
+    elif event.key == pygame.K_DOWN:
+        selected = min(len(weapons) - 1, selected + 1)
+
+    elif event.key == pygame.K_RETURN:
+
+        weapon = weapons[selected]
+
+        gs.weapon = weapon
+
+        gs.game_state = "run"
+
+
+def draw_weapon_select(screen):
+
+    screen.fill((10, 10, 15))
+
+    font = get_font()
+
+    title = font.render("CHOOSE WEAPON", True, (255,255,255))
+
+    screen.blit(title, (200,150))
+
+    weapons = get_unlocked_weapons()
+
+    y = 260
+
+    for i, weapon in enumerate(weapons):
+
+        color = (200,200,200)
+
+        if i == selected:
+            color = (255,255,120)
+
+        text = weapon.upper()
+
+        surf = font.render(text, True, color)
+
+        screen.blit(surf, (260, y))
+
+        y += 50
+
+
+================================================================================
+./core/game.py
+================================================================================
+
+from core import game_state as gs
+
+# systems
+from systems.enemies import move_enemies
+from systems.bullets import move_bullets
+from systems.collisions import bullet_enemy_collision
+from systems.particles import update_particles
+from systems.pickups import update_pickups
+from systems.combo import update_combo
+from systems.dodge import update_dodge
+from systems.laser import update_laser
+from systems.camera import update_camera
+from systems.player_movement import update_player
+from systems.player_combat import handle_shooting
+from systems.boss_logic import update_boss
+from systems.run_director import update_run_director
+from systems.world_integrity import update_world_integrity
+from systems.run_state_controller import update_run_state
+from systems.bot_manager import update_bot_manager
+from systems.run_initializer import start_run
+from systems.combat_system import update_combat
+
+
+
+
+def update_run_flow(keys):
+
+    # trava durante reward
+    if gs.reward_active:
+
+        # BOT AUTO PICK
+        if gs.bot_mode:
+
+            from systems.reward_system import choose_reward
+
+            if gs.reward_choices:
+                choose_reward(0)
+
+        return True
+
+    # timer
+    gs.run_timer += 1
+
+    # i-frames
+    if gs.player_iframes > 0:
+        gs.player_iframes -= 1
+
+    # estado da run (morte etc)
+    if update_run_state():
+        return True
+
+    return False
+
+def update_entities(keys):
+
+    # player
+    update_player()
+
+    # combate
+    update_combat(keys)
+
+    # entidades
+    move_enemies()
+
+    # dodge
+    update_dodge()
+
+
+def update_effects():
+
+    # sistemas secundários
+    update_combo()
+    update_particles()
+    update_pickups()
+
+    # câmera
+    update_camera()
+
+# =========================================================
+# UPDATE WORLD
+# =========================================================
+
+def update_world():
+
+    # director
+    update_run_director()
+
+    # bosses
+    update_boss()
+
+    if gs.miniboss:
+        gs.miniboss.update()
+
+    # mundo
+    update_world_integrity()
+
+
+# =========================================================
+# UPDATE RUN
+# =========================================================
+
+def update_run(keys):
+
+    if update_run_flow(keys):
+        return
+
+    update_world()
+    update_entities(keys)
+    update_effects()
+
+
+# =========================================================
+# UPDATE (ENTRY POINT)
+# =========================================================
+
+def update(keys):
+
+    # HIT STOP
+    if gs.hit_stop > 0:
+        gs.hit_stop -= 1
+        return "hit_stop"
+
+    # start run request
+    if gs.start_requested:
+        gs.start_requested = False
+
+        from systems.run_initializer import start_run
+        start_run()
+
+    if gs.game_state == "run":
+        update_run(keys)
+
+    # BOT MANAGER (fora da run)
+    update_bot_manager(start_run)
+
+
+================================================================================
+./core/game_state.py
 ================================================================================
 
 from core.world import World
@@ -760,7 +1460,127 @@ def __setattr__(name, value):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\core\world.py
+./core/input_handler.py
+================================================================================
+
+from core import game_state as gs
+import pygame
+
+from systems.debug_input import handle_debug_input
+
+from ui.main_menu import update_menu_input
+from ui.shop_menu import update_shop_input
+from ui.weapon_select import update_weapon_select_input
+
+
+def handle_input(event, start_run):
+
+    if event.type != pygame.KEYDOWN:
+        return
+
+    # DEBUG (global)
+    handle_debug_input(event, start_run)
+
+    # -------------------------------------------------
+    # REWARD
+    # -------------------------------------------------
+
+    if gs.reward_active:
+
+        if event.key in (pygame.K_1, pygame.K_2, pygame.K_3):
+
+            from systems.reward_system import choose_reward
+
+            index = event.key - pygame.K_1
+
+            if index < len(gs.reward_choices):
+                choose_reward(index)
+
+        return
+
+    # -------------------------------------------------
+    # GAME STATES
+    # -------------------------------------------------
+
+    if gs.game_state == "menu":
+        update_menu_input(event)
+
+    elif gs.game_state == "shop":
+        update_shop_input(event)
+
+    elif gs.game_state == "weapon_select":
+        update_weapon_select_input(event)
+
+    elif gs.game_state == "result":
+
+        if event.key == pygame.K_SPACE:
+            gs.game_state = "menu"
+
+
+================================================================================
+./core/renderer.py
+================================================================================
+
+import pygame
+
+from core import game_state as gs
+from settings import *
+
+from ui import draw_ui, draw_entities, draw_messages
+from ui.ui import get_font
+
+from systems.camera import get_camera_offset
+
+
+# =========================================================
+# RENDER GAME
+# =========================================================
+
+def render_game(screen):
+
+    shake_x, shake_y = get_camera_offset()
+
+    screen.fill((15, 15, 20))
+
+    draw_entities(screen, shake_x, shake_y)
+    draw_messages(screen)
+    draw_ui(screen)
+
+
+# =========================================================
+# RESULT SCREEN
+# =========================================================
+
+def render_result(screen):
+
+    screen.fill((10,10,15))
+
+    font = get_font()
+
+    text = font.render("RUN OVER", True, (255,255,255))
+    kills = font.render(f"KILLS: {gs.kills}", True, (200,200,200))
+    restart = font.render("PRESS SPACE", True, (160,160,160))
+
+    screen.blit(text, (WIDTH//2 - text.get_width()//2, 250))
+    screen.blit(kills, (WIDTH//2 - kills.get_width()//2, 300))
+    screen.blit(restart, (WIDTH//2 - restart.get_width()//2, 350))
+
+
+# =========================================================
+# MASTER RENDER
+# =========================================================
+
+def render(screen):
+
+    if gs.game_state == "run":
+        render_game(screen)
+
+    elif gs.game_state == "result":
+        render_result(screen)
+
+
+================================================================================
+./core/world.py
 ================================================================================
 
 class World:
@@ -973,421 +1793,7 @@ class World:
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\entities\__init__.py
-================================================================================
-
-
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\entities\boss.py
-================================================================================
-
-import random
-import math
-
-
-class Boss:
-
-    def __init__(self, x, y, hp):
-
-        self.x = x
-        self.y = y
-
-        self.max_hp = hp
-        self.hp = hp
-
-        #entity system
-        self.is_hostile = True
-        self.entity_type = "boss"
-
-        self.timer = 0
-        self.hit_timer = 0
-
-        self.phase = random.random() * 10
-
-        self.width = 80
-        self.height = 60
-
-
-    def update(self):
-
-        self.timer += 1
-
-        if self.y < 80:
-            self.y += 2
-
-        self.phase += 0.04
-        self.x += math.sin(self.phase) * 2.5
-
-        if self.x < 0:
-            self.x = 0
-
-        if self.x > 600 - self.width:
-            self.x = 600 - self.width
-
-        if self.hit_timer > 0:
-            self.hit_timer -= 1
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\entities\bullet.py
-================================================================================
-
-class Bullet:
-
-    def __init__(self, x, y, speed=10, damage=1, pierce=1):
-
-        self.x = x
-        self.y = y
-
-        from core import game_state as gs
-        self.speed = speed * gs.projectile_speed_mult
-        
-        self.damage = damage
-        self.pierce = pierce
-
-
-    def update(self):
-
-        self.y -= self.speed
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\entities\enemy.py
-================================================================================
-
-import math
-import random
-
-
-# =========================================================
-# BASE ENEMY
-# =========================================================
-
-class NormalEnemy:
-
-    def __init__(self, x, y):
-
-        self.x = x
-        self.y = y
-
-        self.width = 40
-        self.height = 40
-
-        # BASE → sempre 1 (scaling vem de fora)
-        self.hp = 1
-        self.base_hp = 1
-
-        self.speed = 2
-
-        self.is_hostile = True
-        self.entity_type = "enemy"
-
-        self.hit_timer = 0
-
-        # GOLDEN SYSTEM
-        self.is_golden = False
-
-
-    def update(self, base_speed):
-
-        self.y += base_speed
-
-        if self.hit_timer > 0:
-            self.hit_timer -= 1
-
-
-    def make_golden(self):
-
-        self.is_golden = True
-
-        # buff controlado (não explode scaling)
-        self.hp = int(self.hp * 1.5)
-
-
-# =========================================================
-# TANK ENEMY
-# =========================================================
-
-class TankEnemy:
-
-    def __init__(self, x, y):
-
-        self.x = x
-        self.y = y
-
-        self.width = 40
-        self.height = 40
-
-        self.hp = 1
-        self.base_hp = 2   # identidade do inimigo
-
-        self.speed = 1.2
-
-        self.is_hostile = True
-        self.entity_type = "enemy"
-
-        self.hit_timer = 0
-
-        self.is_golden = False
-
-
-    def update(self, base_speed):
-
-        self.y += base_speed * 0.6
-
-        if self.hit_timer > 0:
-            self.hit_timer -= 1
-
-
-    def make_golden(self):
-
-        self.is_golden = True
-        self.hp = int(self.hp * 1.4)
-
-
-# =========================================================
-# ZIG ZAG ENEMY
-# =========================================================
-
-class ZigZagEnemy:
-
-    def __init__(self, x, y):
-
-        self.x = x
-        self.y = y
-
-        self.base_x = x
-        self.phase = random.random() * 10
-
-        self.width = 40
-        self.height = 40
-
-        self.hp = 1
-        self.base_hp = 1.5
-
-        self.is_hostile = True
-        self.entity_type = "enemy"
-
-        self.hit_timer = 0
-
-        self.is_golden = False
-
-
-    def update(self, base_speed):
-
-        self.y += base_speed
-
-        self.phase += 0.1
-        self.x = self.base_x + math.sin(self.phase) * 40
-
-        if self.hit_timer > 0:
-            self.hit_timer -= 1
-
-
-    def make_golden(self):
-
-        self.is_golden = True
-        self.hp = int(self.hp * 1.5)
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\entities\miniboss.py
-================================================================================
-
-import math
-from core import game_state as gs
-from systems.boss_profiles import MINIBOSS_PROFILES
-
-
-class MiniBoss:
-
-    def __init__(self, x, y, profile="wander"):
-
-        data = MINIBOSS_PROFILES.get(profile, MINIBOSS_PROFILES["wander"])
-
-        hp = data["hp"]
-
-        self.move_type = data["move"]
-        self.speed = data["speed"]
-
-        self.x = x
-        self.y = y
-
-        self.profile = profile
-
-        self.max_hp = hp
-        self.hp = hp
-
-        # entity system
-        self.is_hostile = True
-        self.entity_type = "miniboss"
-
-        self.timer = 0
-        self.phase = 0
-
-        self.width = 80
-        self.height = 60
-
-        # memória da luta
-        self.start_kills = gs.kills
-        self.start_timer = gs.run_timer
-
-        self.near_miss = 0
-
-        # telemetria
-        self.shots_taken = 0
-        self.shots_hit = 0
-
-
-    # =====================================================
-    # UPDATE
-    # =====================================================
-
-    def update(self, base_speed=None):
-
-        self.timer += 1
-
-        # entrada na tela
-        if self.y < 100:
-            self.y += 2
-
-        # -------------------------------------------------
-        # MOVEMENT TYPES
-        # -------------------------------------------------
-
-        if self.move_type == "top":
-
-            self.phase += 0.04
-            self.x += math.sin(self.phase) * 3
-
-        elif self.move_type == "wander":
-
-            self.phase += 0.03
-            self.x += math.sin(self.phase) * 4
-            self.y += math.cos(self.phase) * 1.2
-
-        elif self.move_type == "hunt":
-
-            px = gs.player_x
-
-            if px > self.x:
-                self.x += self.speed * 2
-            elif px < self.x:
-                self.x -= self.speed * 2
-
-        # -------------------------------------------------
-        # LIMITES DA TELA
-        # -------------------------------------------------
-
-        if self.x < 0:
-            self.x = 0
-
-        if self.x > 600 - self.width:
-            self.x = 600 - self.width
-
-
-    # =====================================================
-    # END FIGHT STATS
-    # =====================================================
-
-    def get_fight_stats(self):
-
-        duration = (gs.run_timer - self.start_timer) / 60
-
-        accuracy = 0.0
-
-        if self.shots_taken > 0:
-            accuracy = self.shots_hit / self.shots_taken
-
-        stats = {
-
-            "duration": duration,
-            "near_miss": self.near_miss,
-            "accuracy": accuracy
-
-        }
-
-        return stats
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\entities\particle.py
-================================================================================
-
-class Particle:
-
-    def __init__(self, x, y, vx, vy, life):
-
-        self.x = x
-        self.y = y
-
-        self.vx = vx
-        self.vy = vy
-
-        self.life = life
-
-
-    def update(self):
-
-        self.x += self.vx
-        self.y += self.vy
-
-        self.life -= 1
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\entities\pickup.py
-================================================================================
-
-import random
-from core import game_state as gs
-
-
-class Pickup:
-
-    def __init__(self, x, y, kind="ammo"):
-
-        self.x = x
-        self.y = y
-
-        self.kind = kind
-
-        # -----------------------------
-        # lifespan (upgrade support)
-        # -----------------------------
-
-        life_mult = getattr(gs, "pickup_lifespan_mult", 1.0)
-        self.life = int(300 * life_mult)
-
-        # -----------------------------
-        # physics
-        # -----------------------------
-
-        self.vx = random.uniform(-1.2, 1.2)
-        self.vy = random.uniform(-2.2, -1.2)
-
-        self.gravity = 0.10
-
-
-    def update(self):
-
-        # movement
-        self.x += self.vx
-        self.y += self.vy
-
-        # gravity
-        self.vy += self.gravity
-
-        # horizontal drag
-        self.vx *= 0.98
-
-        self.life -= 1
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\meta\rewards.py
+./meta/rewards.py
 ================================================================================
 
 from meta.save_data import load_save, save_game
@@ -1403,7 +1809,7 @@ def reward_gems(amount):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\meta\save_data.py
+./meta/save_data.py
 ================================================================================
 
 import json
@@ -1433,7 +1839,7 @@ def save_game(data):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\meta\shop.py
+./meta/shop.py
 ================================================================================
 
 from meta.save_data import load_save, save_game
@@ -1543,14 +1949,14 @@ def buy_upgrade(upgrade):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\__init__.py
+./systems/__init__.py
 ================================================================================
 
 
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\apply_upgrade.py
+./systems/apply_upgrade.py
 ================================================================================
 
 from systems.upgrades_data import UPGRADES
@@ -1684,7 +2090,7 @@ def apply_upgrade(gs, upgrade_id):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\boss_logic.py
+./systems/boss_logic.py
 ================================================================================
 
 from core import game_state as gs
@@ -1742,7 +2148,7 @@ def spawn_minions(boss):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\boss_profiles.py
+./systems/boss_profiles.py
 ================================================================================
 
 # =========================================================
@@ -1791,7 +2197,7 @@ MINIBOSS_PROFILES = {
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\bot_manager.py
+./systems/bot_manager.py
 ================================================================================
 
 from core import game_state as gs
@@ -1837,7 +2243,7 @@ def update_bot_manager(start_run):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\bullets.py
+./systems/bullets.py
 ================================================================================
 
 from core import game_state as gs
@@ -1852,7 +2258,7 @@ def move_bullets():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\camera.py
+./systems/camera.py
 ================================================================================
 
 import random
@@ -1883,7 +2289,7 @@ def get_camera_offset():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\collisions.py
+./systems/collisions.py
 ================================================================================
 
 import pygame
@@ -2207,7 +2613,35 @@ def player_enemy_collision():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\combo.py
+./systems/combat_system.py
+================================================================================
+
+from systems.player_combat import handle_shooting
+from systems.bullets import move_bullets
+from systems.collisions import bullet_enemy_collision
+from systems.laser import update_laser
+
+# =========================================================
+# COMBAT UPDATE
+# =========================================================
+
+def update_combat(keys):
+
+    # shooting
+    handle_shooting(keys)
+
+    # laser (agora faz parte do combate)
+    update_laser()
+
+    # bullets
+    move_bullets()
+
+    # collisions
+    bullet_enemy_collision()
+
+
+================================================================================
+./systems/combo.py
 ================================================================================
 
 from core import game_state as gs
@@ -2257,7 +2691,59 @@ def combo_reward():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\dodge.py
+./systems/debug_input.py
+================================================================================
+
+import pygame
+from core import game_state as gs
+
+
+def handle_debug_input(event, start_run):
+
+    if event.type != pygame.KEYDOWN:
+        return
+
+    # -------------------------------------------------
+    # BOT TYPE
+    # -------------------------------------------------
+
+    if event.key == pygame.K_F1:
+        gs.bot_type = "beginner"
+
+    elif event.key == pygame.K_F2:
+        gs.bot_type = "intermediate"
+
+    elif event.key == pygame.K_F3:
+        gs.bot_type = "advanced"
+
+    # -------------------------------------------------
+    # BOT RUNS
+    # -------------------------------------------------
+
+    elif event.key == pygame.K_F9:
+
+        if gs.bot_type:
+            gs.bot_mode = True
+            gs.bot_runs_remaining = 1
+            start_run()
+
+    elif event.key == pygame.K_F10:
+
+        if gs.bot_type:
+            gs.bot_mode = True
+            gs.bot_runs_remaining = 10
+            start_run()
+
+    elif event.key == pygame.K_F11:
+
+        if gs.bot_type:
+            gs.bot_mode = True
+            gs.bot_runs_remaining = 100
+            start_run()
+
+
+================================================================================
+./systems/dodge.py
 ================================================================================
 
 from core import game_state as gs
@@ -2319,7 +2805,7 @@ def update_dodge():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\drop_system.py
+./systems/drop_system.py
 ================================================================================
 
 import random
@@ -2387,7 +2873,7 @@ def enemy_drop(enemy):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\enemies.py
+./systems/enemies.py
 ================================================================================
 
 from core import game_state as gs
@@ -2410,7 +2896,7 @@ def move_enemies():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\laser.py
+./systems/laser.py
 ================================================================================
 
 from core import game_state as gs
@@ -2462,7 +2948,7 @@ def update_laser():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\nemesis_system.py
+./systems/nemesis_system.py
 ================================================================================
 
 import json
@@ -2586,7 +3072,7 @@ def finalize_run():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\particles.py
+./systems/particles.py
 ================================================================================
 
 import random
@@ -2626,7 +3112,7 @@ def update_particles():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\pickups.py
+./systems/pickups.py
 ================================================================================
 
 import pygame
@@ -2730,7 +3216,7 @@ def update_pickups():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\player_combat.py
+./systems/player_combat.py
 ================================================================================
 
 import pygame
@@ -2865,7 +3351,7 @@ def handle_shooting(keys):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\player_movement.py
+./systems/player_movement.py
 ================================================================================
 
 import pygame
@@ -2897,7 +3383,7 @@ def update_player():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\rage_system.py
+./systems/rage_system.py
 ================================================================================
 
 import math
@@ -2977,7 +3463,7 @@ def trigger_rage_explosion(x, y):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\reward_system.py
+./systems/reward_system.py
 ================================================================================
 
 from core import game_state as gs
@@ -3023,7 +3509,7 @@ def choose_reward(index):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\run_director.py
+./systems/run_director.py
 ================================================================================
 
 from core import game_state as gs
@@ -3282,6 +3768,8 @@ def get_run_context():
 # =========================================================
 
 def update_run_director():
+    from systems.run_logger import log_stage_tick
+    log_stage_tick()
 
     global current_index
     global stage_timer
@@ -3315,7 +3803,29 @@ def update_run_director():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\run_events.py
+./systems/run_ender.py
+================================================================================
+
+from core import game_state as gs
+
+from systems.run_logger import end_run
+from systems.nemesis_system import finalize_run
+from systems.run_rewards import give_run_reward
+
+
+def end_current_run(reason):
+
+    give_run_reward()
+
+    end_run(reason)
+
+    finalize_run()
+
+    gs.game_state = "result"
+
+
+================================================================================
+./systems/run_events.py
 ================================================================================
 
 import random
@@ -3396,7 +3906,7 @@ class CombatEvent:
 
                 group = random.randint(group_min, group_max)
 
-                spawn_group(group, tier)
+                spawn_group(group, tier, intensity)
 
         # ---------------- GOLDEN ----------------
 
@@ -3501,7 +4011,85 @@ class BossEvent:
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\run_logger.py
+./systems/run_initializer.py
+================================================================================
+
+from core import game_state as gs
+from systems.run_logger import start_run as telemetry_start_run, end_run
+from settings import WIDTH, HEIGHT
+# =========================================================
+# START RUN
+# =========================================================
+
+def start_run():
+
+    telemetry_start_run()
+
+    from systems.nemesis_system import start_run as nemesis_start
+    nemesis_start()
+
+    import systems.run_director as run_director
+    run_director.start_run()
+
+    gs.run_timer = 0
+
+    gs.kills = 0
+    gs.chaos = 0
+    gs.combo = 0
+    gs.combo_timer = 0
+
+    gs.enemies.clear()
+    gs.bullets.clear()
+    gs.particles.clear()
+    gs.pickups.clear()
+
+    gs.boss = None
+    gs.miniboss = None
+
+    gs.player_x = WIDTH // 2
+    gs.player_y = HEIGHT - 120
+
+    gs.player_hp = gs.player_max_hp
+    gs.player_iframes = 0
+    gs.ammo = max(1, gs.max_ammo)
+
+    gs.fire_rate_mult = 1.0
+    gs.double_shot = False
+    gs.extra_pierce = 0
+
+    gs.upgrades_taken = []
+
+    gs.player_upgrades = []
+    gs.build_tags = set()
+
+    gs.rage_level = 0
+    gs.rage_radius = 0
+    gs.rage_damage = 0
+    gs.rage_ammo = False
+    gs.rage_chain = False
+
+    gs.ammo_starve_timer = 0
+
+    if hasattr(gs, "world_critical_warning"):
+        del gs.world_critical_warning
+
+    gs.spawn_timer = 0
+    gs.shoot_timer = 0
+
+    gs.world_integrity = gs.max_world_integrity
+
+    gs.reward_active = False
+    gs.reward_choices = []
+
+    if gs.bot_mode:
+        gs.weapon = "pistol"
+        gs.game_state = "run"
+    else:
+        gs.game_state = "weapon_select"
+
+
+================================================================================
+./systems/run_logger.py
 ================================================================================
 
 import json
@@ -3794,15 +4382,63 @@ def log_stage_tick():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\spawn.py
+./systems/run_rewards.py
+================================================================================
+
+from core import game_state as gs
+# reward system
+from meta.rewards import reward_gems
+# =========================================================
+# RUN REWARD
+# =========================================================
+
+def give_run_reward():
+
+    gems = 1
+    gems += gs.kills // 25
+
+    reward_gems(gems)
+
+
+================================================================================
+./systems/run_state_controller.py
+================================================================================
+
+from core import game_state as gs
+
+from systems.collisions import player_enemy_collision
+from systems.run_ender import end_current_run
+
+
+def update_run_state():
+
+    # -------------------------------------------------
+    # PLAYER MORREU
+    # -------------------------------------------------
+
+    if player_enemy_collision():
+        end_current_run("enemy_collision")
+        return True
+
+    # -------------------------------------------------
+    # WORLD MORREU
+    # -------------------------------------------------
+
+    if gs.world_integrity <= 0:
+        end_current_run("world_destroyed")
+        return True
+
+    return False
+
+
+================================================================================
+./systems/spawn.py
 ================================================================================
 
 import random
 
 from core import game_state as gs
 from settings import *
-
-import systems.run_director as run_director
 
 from entities.enemy import (
     NormalEnemy,
@@ -3823,7 +4459,7 @@ def spawn_enemy(enemy):
 # SPAWN GROUP (CONTROLADO PELO DIRECTOR)
 # =========================================================
 
-def spawn_group(size, tier):
+def spawn_group(size, tier, intensity):
 
     for _ in range(size):
 
@@ -3831,7 +4467,7 @@ def spawn_group(size, tier):
 
         enemy = choose_enemy(tier, x)
 
-        apply_scaling(enemy, tier)
+        apply_scaling(enemy, tier, intensity)
 
         spawn_enemy(enemy)
 
@@ -3878,9 +4514,7 @@ def choose_enemy(tier, x):
 # SCALING SYSTEM (CORE DO BALANCE)
 # =========================================================
 
-def apply_scaling(enemy, tier):
-
-    intensity = run_director.get_intensity()
+def apply_scaling(enemy, tier, intensity):
 
     # ---------------- TIER BASE ----------------
 
@@ -3897,14 +4531,13 @@ def apply_scaling(enemy, tier):
 
     intensity_mult = 1 + (intensity * 1.8)
 
-    # ---------------- BASE HP DO ENEMY ----------------
+    # ---------------- BASE HP ----------------
 
     base_hp = getattr(enemy, "base_hp", 1)
 
     # ---------------- FINAL ----------------
 
     enemy.hp = int(base_hp * tier_mult * intensity_mult)
-
     enemy.hp = max(1, enemy.hp)
 
 
@@ -3913,12 +4546,11 @@ def apply_scaling(enemy, tier):
 # =========================================================
 
 def spawn_position():
-
     return random.randint(0, WIDTH - ENEMY_W)
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\upgrades_data.py
+./systems/upgrades_data.py
 ================================================================================
 
 UPGRADES = {
@@ -4277,7 +4909,7 @@ UPGRADES = {
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\upgrades_selector.py
+./systems/upgrades_selector.py
 ================================================================================
 
 import random
@@ -4487,7 +5119,7 @@ def generate_upgrade_choices(gs):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\weapons.py
+./systems/weapons.py
 ================================================================================
 
 from core import game_state as gs
@@ -4604,7 +5236,7 @@ def shoot_weapon(bx, by, weapon, hits, damage):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\weapons_data.py
+./systems/weapons_data.py
 ================================================================================
 
 WEAPONS = {
@@ -4633,7 +5265,7 @@ WEAPONS = {
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\world_integrity.py
+./systems/world_integrity.py
 ================================================================================
 
 from core import game_state as gs
@@ -4683,7 +5315,7 @@ def update_world_integrity():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\bots\bot_advanced.py
+./systems/bots/bot_advanced.py
 ================================================================================
 
 from core import game_state as gs
@@ -4725,7 +5357,7 @@ def update():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\bots\bot_base.py
+./systems/bots/bot_base.py
 ================================================================================
 
 import random
@@ -4801,7 +5433,7 @@ def jitter(prob=0.02):
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\bots\bot_beginner.py
+./systems/bots/bot_beginner.py
 ================================================================================
 
 import random
@@ -4837,7 +5469,7 @@ def update():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\systems\bots\bot_intermediate.py
+./systems/bots/bot_intermediate.py
 ================================================================================
 
 from core import game_state as gs
@@ -4878,832 +5510,427 @@ def update():
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\ui\__init__.py
+./entities/__init__.py
 ================================================================================
 
-from .ui import init_ui
-from .hud import draw_ui
-from .messages import spawn_message
-from .render import draw_entities
-from .messages import draw_messages
+
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\ui\hud.py
-================================================================================
-
-import pygame
-from core import game_state as gs
-from .ui import get_font
-from settings import *
-
-import systems.run_director as run_director
-
-
-def draw_ui(screen):
-
-    font = get_font()
-
-    # -------------------------------------------------
-    # PLAYER INFO
-    # -------------------------------------------------
-
-    screen.blit(
-        font.render(f"Kills: {gs.kills}", True, (255,255,255)),
-        (10,10)
-    )
-
-    screen.blit(
-        font.render(f"Ammo: {gs.ammo}/{gs.max_ammo}", True, (255,255,255)),
-        (10,40)
-    )
-
-    screen.blit(
-        font.render(f"Weapon: {gs.weapon}", True, (255,255,255)),
-        (10,70)
-    )
-
-    screen.blit(
-        font.render(f"HP: {gs.player_hp}", True, (255,120,120)),
-        (10,100)
-    )
-
-    # -------------------------------------------------
-    # RUN TIMER
-    # -------------------------------------------------
-
-    minutes = gs.run_timer // 3600
-    seconds = (gs.run_timer % 3600) // 60
-
-    timer_text = f"{minutes}:{seconds:02d}"
-
-    timer_surface = font.render(timer_text, True, (255,255,255))
-
-    screen.blit(
-        timer_surface,
-        (WIDTH//2 - timer_surface.get_width()//2, 10)
-    )
-
-
-    # -------------------------------------------------
-    # STAGE
-    # -------------------------------------------------
-
-    phase_surface = font.render(
-        f"Stage {run_director.current_index + 1}",
-        True,
-        (180,180,180)
-    )
-
-    screen.blit(
-        phase_surface,
-        (WIDTH//2 - phase_surface.get_width()//2, 40)
-    )
-
-
-    # -------------------------------------------------
-    # INTENSITY DEBUG
-    # -------------------------------------------------
-
-    intensity = run_director.get_intensity()
-
-    intensity_text = font.render(
-        f"Intensity: {int(intensity*100)}%",
-        True,
-        (200,200,120)
-    )
-
-    screen.blit(intensity_text, (10,130))
-
-
-    # -------------------------------------------------
-    # BOT MODE INFO
-    # -------------------------------------------------
-
-    if gs.bot_mode:
-
-        bot_text = font.render(
-            f"BOT RUNS LEFT: {gs.bot_runs_remaining}",
-            True,
-            (120,200,255)
-        )
-
-        screen.blit(
-            bot_text,
-            (WIDTH - bot_text.get_width() - 20, 10)
-        )
-
-
-    # -------------------------------------------------
-    # BOSS HP BAR
-    # -------------------------------------------------
-
-    if gs.boss:
-
-        bar_w = 320
-        bar_h = 18
-
-        x = WIDTH // 2 - bar_w // 2
-        y = 70
-
-        ratio = gs.boss.hp / gs.boss.max_hp if gs.boss.max_hp else 0
-        ratio = max(0, min(1, ratio))
-
-        pygame.draw.rect(screen, (60,0,0), (x,y,bar_w,bar_h))
-        pygame.draw.rect(screen, (255,60,60), (x,y,int(bar_w*ratio),bar_h))
-        pygame.draw.rect(screen, (255,255,255), (x,y,bar_w,bar_h), 2)
-
-
-    # -------------------------------------------------
-    # WORLD INTEGRITY BAR
-    # -------------------------------------------------
-
-    bar_w = 200
-    bar_h = 14
-
-    x = WIDTH - bar_w - 20
-    y = HEIGHT - 40
-
-    ratio = max(
-        0,
-        min(1, gs.world_integrity / gs.max_world_integrity)
-    )
-
-    pygame.draw.rect(screen, (40,40,40), (x,y,bar_w,bar_h))
-    pygame.draw.rect(screen, (80,220,120), (x,y,int(bar_w * ratio),bar_h))
-    pygame.draw.rect(screen, (255,255,255), (x,y,bar_w,bar_h), 2)
-
-    label = font.render("WORLD", True, (255,255,255))
-
-    screen.blit(label, (x - label.get_width() - 10, y - 4))
-
-
-    # -------------------------------------------------
-    # REWARD SCREEN
-    # -------------------------------------------------
-
-    if gs.reward_active:
-
-        big_font = pygame.font.SysFont(None, 42)
-
-        title = big_font.render("CHOOSE UPGRADE", True, (255,255,255))
-
-        screen.blit(
-            title,
-            (WIDTH//2 - title.get_width()//2, 200)
-        )
-
-        y = 300
-
-        for i, upgrade in enumerate(gs.reward_choices):
-
-            text = f"{i+1} - {format_upgrade(upgrade)}"
-
-            surf = font.render(text, True, (255,255,120))
-
-            screen.blit(
-                surf,
-                (WIDTH//2 - surf.get_width()//2, y)
-            )
-
-            y += 50
-
-        info = font.render("PRESS 1 / 2 / 3", True, (200,200,200))
-
-        screen.blit(
-            info,
-            (WIDTH//2 - info.get_width()//2, y + 20)
-        )
-
-
-# -------------------------------------------------
-# FORMAT UPGRADE TEXT
-# -------------------------------------------------
-
-def format_upgrade(up):
-
-    names = {
-
-        "fire_rate": "Faster Fire Rate",
-
-        "double_shot": "Double Shot",
-
-        "pierce": "Bullet Pierce",
-
-        "ammo_cap": "Increase Ammo",
-
-        "hp": "Extra HP"
-
-    }
-
-    return names.get(up, up)
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\ui\main_menu.py
-================================================================================
-
-import pygame
-
-from ui.ui import get_font
-from core import game_state as gs
-
-
-selected = 0
-
-options = [
-    "START RUN",
-    "SHOP",
-    "QUIT"
-]
-
-
-def update_menu_input(event):
-
-    global selected
-
-    if event.key == pygame.K_UP:
-        selected = max(0, selected-1)
-
-    elif event.key == pygame.K_DOWN:
-        selected = min(len(options)-1, selected+1)
-
-    elif event.key == pygame.K_RETURN:
-
-        if options[selected] == "START RUN":
-            gs.start_requested = True
-
-        elif options[selected] == "SHOP":
-            gs.game_state = "shop"
-
-        elif options[selected] == "QUIT":
-            pygame.quit()
-            exit()
-
-
-def draw_main_menu(screen):
-
-    font = get_font()
-
-    screen.fill((10,10,15))
-
-    title = font.render("CHAOS DODGE", True, (255,255,255))
-
-    screen.blit(title, (200,120))
-
-    # -------------------------------------------------
-    # BOT DEBUG INFO
-    # -------------------------------------------------
-    font_small = get_font()
-
-    y_bot = 420
-
-    screen.blit(
-        font_small.render("BOT TEST MODE", True, (120,200,255)),
-        (20, y_bot)
-    )
-
-    y_bot += 30
-
-    screen.blit(
-        font_small.render("F1 Beginner", True, (200,200,200)),
-        (20, y_bot)
-    )
-
-    y_bot += 25
-
-    screen.blit(
-        font_small.render("F2 Intermediate", True, (200,200,200)),
-        (20, y_bot)
-    )
-
-    y_bot += 25
-
-    screen.blit(
-        font_small.render("F3 Advanced", True, (200,200,200)),
-        (20, y_bot)
-    )
-
-    y_bot += 30
-
-    screen.blit(
-        font_small.render("F9  → 1 Run", True, (200,200,200)),
-        (20, y_bot)
-    )
-
-    y_bot += 25
-
-    screen.blit(
-        font_small.render("F10 → 10 Runs", True, (200,200,200)),
-        (20, y_bot)
-    )
-
-    y_bot += 25
-
-    screen.blit(
-        font_small.render("F11 → 100 Runs", True, (200,200,200)),
-        (20, y_bot)
-    )
-
-    y_bot += 30
-
-    bot_name = getattr(gs, "bot_type", None)
-
-    if bot_name:
-        text = f"CURRENT BOT: {bot_name.upper()}"
-    else:
-        text = "CURRENT BOT: NONE"
-
-    screen.blit(
-        font_small.render(text, True, (255,255,120)),
-        (20, y_bot)
-    )
-
-
-
-    y = 260
-
-    for i, option in enumerate(options):
-
-        color = (200,200,200)
-
-        if i == selected:
-            color = (255,255,120)
-
-        surf = font.render(option, True, color)
-
-        screen.blit(surf, (240,y))
-
-        y += 60
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\ui\messages.py
+./entities/boss.py
 ================================================================================
 
 import random
-import pygame
+import math
+
+
+class Boss:
+
+    def __init__(self, x, y, hp):
+
+        self.x = x
+        self.y = y
+
+        self.max_hp = hp
+        self.hp = hp
+
+        #entity system
+        self.is_hostile = True
+        self.entity_type = "boss"
+
+        self.timer = 0
+        self.hit_timer = 0
+
+        self.phase = random.random() * 10
+
+        self.width = 80
+        self.height = 60
+
+
+    def update(self):
+
+        self.timer += 1
+
+        if self.y < 80:
+            self.y += 2
+
+        self.phase += 0.04
+        self.x += math.sin(self.phase) * 2.5
+
+        if self.x < 0:
+            self.x = 0
+
+        if self.x > 600 - self.width:
+            self.x = 600 - self.width
+
+        if self.hit_timer > 0:
+            self.hit_timer -= 1
+
+
+================================================================================
+./entities/bullet.py
+================================================================================
+
+class Bullet:
+
+    def __init__(self, x, y, speed=10, damage=1, pierce=1):
+
+        self.x = x
+        self.y = y
+
+        from core import game_state as gs
+        self.speed = speed * gs.projectile_speed_mult
+        
+        self.damage = damage
+        self.pierce = pierce
+
+
+    def update(self):
+
+        self.y -= self.speed
+
+
+================================================================================
+./entities/enemy.py
+================================================================================
+
+import math
+import random
+
 from core import game_state as gs
-from .ui import get_font
 
 
-def spawn_message(text, x, y, color):
+# =========================================================
+# BASE ENEMY
+# =========================================================
 
-    # -------------------------------------------------
-    # COMBO MESSAGE UPDATE (não criar várias)
-    # -------------------------------------------------
+class NormalEnemy:
 
-    if text.startswith("COMBO"):
+    def __init__(self, x, y):
 
-        for msg in gs.messages:
+        self.x = x
+        self.y = y
 
-            if msg[0].startswith("COMBO"):
+        self.width = 40
+        self.height = 40
 
-                msg[0] = text
-                msg[1] = 60
-                return
+        self.hp = 1
+        self.base_hp = 1
 
-    # -------------------------------------------------
-    # NOVA MENSAGEM
-    # -------------------------------------------------
+        self.speed = 2
 
-    offset_x = random.randint(-20, 20)
+        self.is_hostile = True
+        self.entity_type = "enemy"
 
-    stack_offset = len(gs.messages) * 18
+        self.hit_timer = 0
 
-    gs.messages.append([
-        text,                # 0 text
-        60,                  # 1 life
-        x + offset_x,        # 2 x
-        y - stack_offset,    # 3 y
-        color                # 4 color
-    ])
+        # ---------------- GOLDEN ----------------
+        self.is_golden = False
+        self.golden_active = False
+        self.invulnerable = False
+        self.golden_phase = None  # "rising" | "falling"
 
 
-def draw_messages(screen):
+    # =========================================================
+    # GOLDEN
+    # =========================================================
 
-    font = get_font()
+    def make_golden(self):
 
-    for msg in gs.messages[:]:
+        self.is_golden = True
+        self.golden_active = True
+        self.golden_phase = "rising"
+        self.invulnerable = True
 
-        text = msg[0]
-        life = msg[1]
-        x = msg[2]
-        y = msg[3]
-        color = msg[4]
+        # IMPACTO VISUAL
+        gs.hit_stop = 10
+        gs.screen_shake = 20
+        gs.screen_shake_power = 6
 
-        surf = font.render(text, True, color)
 
-        # -------------------------------------------------
-        # FADE
-        # -------------------------------------------------
+    # =========================================================
+    # UPDATE
+    # =========================================================
 
-        alpha = int(255 * (life / 60))
-        surf.set_alpha(alpha)
+    def update(self, base_speed):
 
-        screen.blit(surf, (x, y))
+        # =========================
+        # GOLDEN BEHAVIOR
+        # =========================
 
-        # -------------------------------------------------
-        # ANIMAÇÃO
-        # -------------------------------------------------
+        if self.golden_active:
 
-        msg[1] -= 1
-        msg[3] -= 0.4
+            # ---------------- RISING ----------------
+            if self.golden_phase == "rising":
 
-        if msg[1] <= 0:
-            gs.messages.remove(msg)
+                self.y -= 2  # subida lenta
+
+                # chegou topo
+                if self.y <= 40:
+                    self.golden_phase = "falling"
+                    self.invulnerable = False
+
+            # ---------------- FALLING ----------------
+            elif self.golden_phase == "falling":
+
+                self.y += base_speed * 0.6  # descida lenta
+
+                # colisão com outros inimigos
+                for e in gs.enemies:
+
+                    if e is self:
+                        continue
+
+                    if abs(e.x - self.x) < 30 and abs(e.y - self.y) < 30:
+                        e.hp = 0  # explode
+
+
+        else:
+            # comportamento normal
+            self.y += base_speed
+
+        # =========================
+        # HIT TIMER
+        # =========================
+
+        if self.hit_timer > 0:
+            self.hit_timer -= 1
+
+
+# =========================================================
+# TANK ENEMY
+# =========================================================
+
+class TankEnemy(NormalEnemy):
+
+    def __init__(self, x, y):
+        super().__init__(x, y)
+
+        self.base_hp = 2
+        self.hp = 2
+
+
+# =========================================================
+# ZIG ZAG ENEMY
+# =========================================================
+
+class ZigZagEnemy(NormalEnemy):
+
+    def __init__(self, x, y):
+        super().__init__(x, y)
+
+        self.base_x = x
+        self.phase = random.random() * 10
+
+        self.base_hp = 1.5
+        self.hp = 1
+
+
+    def update(self, base_speed):
+
+        if self.golden_active:
+            super().update(base_speed)
+            return
+
+        self.y += base_speed
+
+        self.phase += 0.1
+        self.x = self.base_x + math.sin(self.phase) * 40
+
+        if self.hit_timer > 0:
+            self.hit_timer -= 1
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\ui\render.py
+./entities/miniboss.py
 ================================================================================
 
-import pygame
 import math
 from core import game_state as gs
-from settings import *
-from entities.enemy import TankEnemy, ZigZagEnemy
+from systems.boss_profiles import MINIBOSS_PROFILES
 
 
-def draw_entities(screen, offset_x=0, offset_y=0):
+class MiniBoss:
 
-    # PLAYER
+    def __init__(self, x, y, profile="wander"):
 
-    pygame.draw.rect(
-        screen,
-        (80,160,255),
-        (
-            gs.player_x + offset_x,
-            gs.player_y + offset_y,
-            PLAYER_W,
-            PLAYER_H
-        )
-    )
+        data = MINIBOSS_PROFILES.get(profile, MINIBOSS_PROFILES["wander"])
 
-    # BULLETS
+        hp = data["hp"]
 
-    for b in gs.bullets:
+        self.move_type = data["move"]
+        self.speed = data["speed"]
 
-        pygame.draw.rect(
-            screen,
-            (255,230,50),
-            (
-                b.x + offset_x,
-                b.y + offset_y,
-                BULLET_W,
-                BULLET_H
-            )
-        )
+        self.x = x
+        self.y = y
 
-    # ENEMIES
+        self.profile = profile
 
-    for e in gs.enemies:
+        self.max_hp = hp
+        self.hp = hp
 
-        color = (220,60,60)
+        # entity system
+        self.is_hostile = True
+        self.entity_type = "miniboss"
 
-        if isinstance(e, TankEnemy):
-            color = (60,160,60)
+        self.timer = 0
+        self.phase = 0
 
-        elif isinstance(e, ZigZagEnemy):
-            color = (200,60,255)
+        self.width = 80
+        self.height = 60
 
-        w = ENEMY_W
-        h = ENEMY_H
+        # memória da luta
+        self.start_kills = gs.kills
+        self.start_timer = gs.run_timer
 
-        if getattr(e, "is_golden", False):
+        self.near_miss = 0
 
-            # -------------------------------------------------
-            # PULSE EFFECT
-            # -------------------------------------------------
+        # telemetria
+        self.shots_taken = 0
+        self.shots_hit = 0
 
-            phase = getattr(e, "golden_phase", 0)
 
-            pulse = math.sin(phase) * 0.05
+    # =====================================================
+    # UPDATE
+    # =====================================================
 
-            scale = getattr(e, "golden_scale", 1.2) + pulse
+    def update(self, base_speed=None):
 
-            w = int(ENEMY_W * scale)
-            h = int(ENEMY_H * scale)
+        self.timer += 1
 
-            # -------------------------------------------------
-            # FLASH IF INVULNERABLE
-            # -------------------------------------------------
-
-            if getattr(e, "golden_invulnerable", False):
-
-                if int(phase * 6) % 2 == 0:
-                    color = (255,255,200)
-                else:
-                    color = (255,210,80)
-
-            else:
-                color = (255,210,80)
-
-        pygame.draw.rect(
-            screen,
-            color,
-            (
-                e.x + offset_x - (w - ENEMY_W)//2,
-                e.y + offset_y - (h - ENEMY_H)//2,
-                w,
-                h
-            )
-        )
+        # entrada na tela
+        if self.y < 100:
+            self.y += 2
 
         # -------------------------------------------------
-        # GOLDEN OUTLINE
+        # MOVEMENT TYPES
         # -------------------------------------------------
 
-        if getattr(e, "is_golden", False):
+        if self.move_type == "top":
 
-            pygame.draw.rect(
-                screen,
-                (255,255,200),
-                (
-                    e.x + offset_x - (w - ENEMY_W)//2 - 2,
-                    e.y + offset_y - (h - ENEMY_H)//2 - 2,
-                    w + 4,
-                    h + 4
-                ),
-                2
-            )
+            self.phase += 0.04
+            self.x += math.sin(self.phase) * 3
 
-    # MINIBOSS
+        elif self.move_type == "wander":
 
-    if gs.miniboss:
+            self.phase += 0.03
+            self.x += math.sin(self.phase) * 4
+            self.y += math.cos(self.phase) * 1.2
 
-        pygame.draw.rect(
-            screen,
-            (255,140,60),
-            (
-                gs.miniboss.x + offset_x,
-                gs.miniboss.y + offset_y,
-                gs.miniboss.width,
-                gs.miniboss.height
-            )
-        )
+        elif self.move_type == "hunt":
 
-    # BOSS
+            px = gs.player_x
 
-    if gs.boss:
+            if px > self.x:
+                self.x += self.speed * 2
+            elif px < self.x:
+                self.x -= self.speed * 2
 
-        pygame.draw.rect(
-            screen,
-            (255,80,120),
-            (
-                gs.boss.x + offset_x,
-                gs.boss.y + offset_y,
-                80,
-                60
-            )
-        )
+        # -------------------------------------------------
+        # LIMITES DA TELA
+        # -------------------------------------------------
 
-    # LASER CHARGE
+        if self.x < 0:
+            self.x = 0
 
-    if gs.laser_charging:
+        if self.x > 600 - self.width:
+            self.x = 600 - self.width
 
-        px = gs.player_x + PLAYER_W // 2 + offset_x
-        py = gs.player_y + offset_y
 
-        pygame.draw.circle(screen, (80,200,255), (px,py), 6)
-        pygame.draw.circle(screen, (150,255,255), (px,py), 10, 2)
+    # =====================================================
+    # END FIGHT STATS
+    # =====================================================
 
-    # LASER
+    def get_fight_stats(self):
 
-    if gs.laser_active:
+        duration = (gs.run_timer - self.start_timer) / 60
 
-        lx = gs.laser_x + offset_x
-        top = gs.player_y - gs.laser_length + offset_y
+        accuracy = 0.0
 
-        pygame.draw.line(
-            screen,
-            (100,255,255),
-            (lx, gs.player_y + offset_y),
-            (lx, top),
-            5
-        )
+        if self.shots_taken > 0:
+            accuracy = self.shots_hit / self.shots_taken
 
-    # PICKUPS
+        stats = {
 
-    for p in gs.pickups:
+            "duration": duration,
+            "near_miss": self.near_miss,
+            "accuracy": accuracy
 
-        x = p.x + offset_x
-        y = p.y + offset_y
+        }
 
-        # ---------------- AMMO ----------------
-        if p.kind == "ammo":
-
-            pygame.draw.rect(
-                screen,
-                (80,180,255),
-                (x, y, 16, 16)
-            )
-
-        # ---------------- GEM ----------------
-        elif p.kind == "gem":
-
-            pygame.draw.circle(
-                screen,
-                (220,40,40),
-                (int(x + 5), int(y + 5)),
-                5
-            )
-
-        # ---------------- FALLBACK ----------------
-        else:
-
-            pygame.draw.rect(
-                screen,
-                (80,255,120),
-                (x, y, 14, 14)
-            )
-
-    # PARTICLES
-
-    for p in gs.particles:
-
-        pygame.draw.circle(
-            screen,
-            (255,200,50),
-            (
-                int(p.x + offset_x),
-                int(p.y + offset_y)
-            ),
-            2
-        )
+        return stats
 
 
 ================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\ui\shop_menu.py
+./entities/particle.py
 ================================================================================
 
-import pygame
+class Particle:
 
-from ui.ui import get_font
-from meta.shop import (
-    WEAPON_ITEMS,
-    UPGRADE_ITEMS,
-    buy_weapon,
-    buy_upgrade,
-    get_player_gems,
-    get_unlocked_weapons,
-    get_unlocked_upgrades
-)
+    def __init__(self, x, y, vx, vy, life):
 
+        self.x = x
+        self.y = y
+
+        self.vx = vx
+        self.vy = vy
+
+        self.life = life
+
+
+    def update(self):
+
+        self.x += self.vx
+        self.y += self.vy
+
+        self.life -= 1
+
+
+================================================================================
+./entities/pickup.py
+================================================================================
+
+import random
 from core import game_state as gs
 
 
-selected_index = 0
+class Pickup:
 
+    def __init__(self, x, y, kind="ammo"):
 
-def update_shop_input(event):
+        self.x = x
+        self.y = y
 
-    global selected_index
+        self.kind = kind
 
-    items = list(WEAPON_ITEMS.keys()) + list(UPGRADE_ITEMS.keys())
+        # -----------------------------
+        # lifespan (upgrade support)
+        # -----------------------------
 
-    if event.key == pygame.K_UP:
-        selected_index = max(0, selected_index - 1)
+        life_mult = getattr(gs, "pickup_lifespan_mult", 1.0)
+        self.life = int(300 * life_mult)
 
-    elif event.key == pygame.K_DOWN:
-        selected_index = min(len(items)-1, selected_index + 1)
+        # -----------------------------
+        # physics
+        # -----------------------------
 
-    elif event.key == pygame.K_RETURN:
+        self.vx = random.uniform(-1.2, 1.2)
+        self.vy = random.uniform(-2.2, -1.2)
 
-        item = items[selected_index]
+        self.gravity = 0.10
 
-        if item in WEAPON_ITEMS:
-            buy_weapon(item)
 
-        elif item in UPGRADE_ITEMS:
-            buy_upgrade(item)
+    def update(self):
 
-    elif event.key == pygame.K_ESCAPE:
+        # movement
+        self.x += self.vx
+        self.y += self.vy
 
-        gs.game_state = "menu"
+        # gravity
+        self.vy += self.gravity
 
+        # horizontal drag
+        self.vx *= 0.98
 
-def draw_shop(screen):
-
-    font = get_font()
-
-    screen.fill((10,10,15))
-
-    title = font.render("SHOP", True, (255,255,255))
-    screen.blit(title, (260,100))
-
-    gems = get_player_gems()
-    gem_text = font.render(f"GEMS: {gems}", True, (180,180,255))
-    screen.blit(gem_text, (250,140))
-
-    unlocked_weapons = get_unlocked_weapons()
-    unlocked_upgrades = get_unlocked_upgrades()
-
-    items = list(WEAPON_ITEMS.items()) + list(UPGRADE_ITEMS.items())
-
-    y = 220
-
-    for i, (item, price) in enumerate(items):
-
-        color = (200,200,200)
-
-        if i == selected_index:
-            color = (255,255,120)
-
-        text = f"{item.upper()} - {price} gems"
-
-        if item in unlocked_weapons or item in unlocked_upgrades:
-            text += " (OWNED)"
-
-        surf = font.render(text, True, color)
-
-        screen.blit(surf, (160,y))
-
-        y += 40
-
-    info = font.render("ENTER BUY | ESC BACK", True, (150,150,150))
-    screen.blit(info, (170, y + 20))
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\ui\ui.py
-================================================================================
-
-import pygame
-
-font = None
-
-
-def init_ui():
-    global font
-    font = pygame.font.SysFont(None, 36)
-
-
-def get_font():
-    return font
-
-
-================================================================================
-C:\Users\heito\Documents\Programação\chaos_dodge - v2\ui\weapon_select.py
-================================================================================
-
-import pygame
-
-from core import game_state as gs
-from ui.ui import get_font
-from meta.shop import get_unlocked_weapons
-
-
-selected = 0
-
-
-def update_weapon_select_input(event):
-
-    global selected
-
-    weapons = get_unlocked_weapons()
-
-    if event.key == pygame.K_UP:
-        selected = max(0, selected - 1)
-
-    elif event.key == pygame.K_DOWN:
-        selected = min(len(weapons) - 1, selected + 1)
-
-    elif event.key == pygame.K_RETURN:
-
-        weapon = weapons[selected]
-
-        gs.weapon = weapon
-
-        gs.game_state = "run"
-
-
-def draw_weapon_select(screen):
-
-    screen.fill((10, 10, 15))
-
-    font = get_font()
-
-    title = font.render("CHOOSE WEAPON", True, (255,255,255))
-
-    screen.blit(title, (200,150))
-
-    weapons = get_unlocked_weapons()
-
-    y = 260
-
-    for i, weapon in enumerate(weapons):
-
-        color = (200,200,200)
-
-        if i == selected:
-            color = (255,255,120)
-
-        text = weapon.upper()
-
-        surf = font.render(text, True, color)
-
-        screen.blit(surf, (260, y))
-
-        y += 50
+        self.life -= 1
 
