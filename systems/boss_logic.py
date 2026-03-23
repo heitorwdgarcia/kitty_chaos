@@ -22,14 +22,6 @@ def update_boss():
 
         spawn_minions(boss)
 
-    # ---------------------------------
-    # BOSS MORRE
-    # ---------------------------------
-
-    if boss.hp <= 0:
-
-        gs.boss = None
-
 
 def spawn_minions(boss):
 

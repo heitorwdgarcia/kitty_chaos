@@ -73,7 +73,7 @@ def draw_entities(screen, offset_x=0, offset_y=0):
             # FLASH IF INVULNERABLE
             # -------------------------------------------------
 
-            if getattr(e, "golden_invulnerable", False):
+            if getattr(e, "invulnerable", False):
 
                 if int(phase * 6) % 2 == 0:
                     color = (255,255,200)

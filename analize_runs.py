@@ -1,7 +1,7 @@
 import json
 from collections import Counter, defaultdict
 
-FILE = "telemetry_runs.jsonl"
+FILE = r"C:\Users\heito\Documents\Programação\chaos_dodge - v2\telemetry_runs.jsonl"
 OUTPUT = "analysis_report.txt"
 
 
@@ -24,8 +24,8 @@ def load_runs():
 
             try:
                 runs.append(json.loads(line))
-            except:
-                pass
+            except Exception as e:
+                print(f"Erro ao ler run: {e}")
 
     return runs
 
@@ -101,17 +101,19 @@ def analyze(runs):
         if ev:
             death_event[ev] += 1
 
-        times = r.get("stage_time", [])
-        kills = r.get("stage_kills", [])
-        pressure = r.get("spawn_pressure", [])
+        times = r.get("stage_time") or []
+        kills = r.get("stage_kills") or []
+        pressure = r.get("spawn_pressure") or []
 
-        for i in range(len(times)):
+        min_len = min(len(times), len(kills), len(pressure))
+
+        times = times[:min_len]
+        kills = kills[:min_len]
+        pressure = pressure[:min_len]
+
+        for i in range(min_len):
             stage_time[i].append(times[i])
-
-        for i in range(len(kills)):
             stage_kills[i].append(kills[i])
-
-        for i in range(len(pressure)):
             stage_pressure[i].append(pressure[i])
 
         for up in r.get("upgrades_taken", []):

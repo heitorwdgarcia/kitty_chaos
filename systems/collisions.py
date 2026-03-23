@@ -5,7 +5,7 @@ from core import game_state as gs
 from settings import *
 
 from systems.particles import spawn_hit_particles
-from ui import spawn_message
+
 
 from systems.run_logger import (
     log_kill,
@@ -14,48 +14,8 @@ from systems.run_logger import (
     log_player_hp_loss
 )
 
-from systems.drop_system import enemy_drop
+from systems.damage_system import request_damage
 
-
-# =========================================================
-# KILL ENEMY
-# =========================================================
-
-def kill_enemy(enemy):
-
-    cx = enemy.x + ENEMY_W // 2
-    cy = enemy.y + ENEMY_H // 2
-
-    enemy_drop(enemy)
-
-    if getattr(enemy, "is_golden", False):
-
-        from systems.reward_system import spawn_chest
-        spawn_chest()
-
-    spawn_hit_particles(cx, cy)
-
-    gs.kills += 1
-    log_kill()
-
-    gs.chaos += 0.3
-
-    gs.combo += 1
-    gs.combo_timer = int(60 * gs.combo_duration_mult)
-
-    if gs.combo >= 2:
-        spawn_message(
-            f"COMBO x{gs.combo}",
-            cx,
-            cy - 20,
-            (255, 220, 120)
-        )
-
-    from systems.combo import combo_reward
-    combo_reward()
-
-    if enemy in gs.enemies:
-        gs.enemies.remove(enemy)
 
 
 # =========================================================
@@ -65,7 +25,7 @@ def kill_enemy(enemy):
 def bullet_enemy_collision():
 
     # =========================================================
-    # LASER COLLISION SYSTEM
+    # LASER
     # =========================================================
 
     if gs.laser_active:
@@ -79,27 +39,31 @@ def bullet_enemy_collision():
             gs.laser_length
         )
 
-        for enemy in gs.enemies[:]:
+        targets = []
+        targets.extend(gs.enemies)
 
-            enemy_rect = pygame.Rect(
-                enemy.x,
-                enemy.y,
-                ENEMY_W,
-                ENEMY_H
-            )
+        if gs.miniboss:
+            targets.append(gs.miniboss)
 
-            if laser_rect.colliderect(enemy_rect):
+        if gs.boss:
+            targets.append(gs.boss)
 
-                if getattr(enemy, "golden_invulnerable", False):
+        for target in targets[:]:
+
+            w = getattr(target, "width", ENEMY_W)
+            h = getattr(target, "height", ENEMY_H)
+
+            rect = pygame.Rect(target.x, target.y, w, h)
+
+            if laser_rect.colliderect(rect):
+
+                if getattr(target, "invulnerable", False):
                     continue
 
-                enemy.hp -= gs.bullet_damage_mult
-                enemy.hit_timer = 6
+                request_damage(target, gs.bullet_damage_mult, source="laser")
 
-                log_hit_enemy()
-
-                if enemy.hp <= 0:
-                    kill_enemy(enemy)
+                if hasattr(target, "hit_timer"):
+                    target.hit_timer = 6
 
                 pierce_left -= 1
 
@@ -107,53 +71,8 @@ def bullet_enemy_collision():
                     gs.laser_active = False
                     break
 
-        if gs.miniboss:
-
-            miniboss_rect = pygame.Rect(
-                gs.miniboss.x,
-                gs.miniboss.y,
-                gs.miniboss.width,
-                gs.miniboss.height
-            )
-
-            if laser_rect.colliderect(miniboss_rect):
-
-                gs.miniboss.hp -= gs.bullet_damage_mult
-                log_hit_enemy()
-
-                if gs.miniboss.hp <= 0:
-
-                    from systems.nemesis_system import record_fight
-
-                    stats = gs.miniboss.get_fight_stats()
-                    record_fight(gs.miniboss.profile, stats)
-
-                    gs.miniboss = None
-
-        if gs.boss:
-
-            boss_rect = pygame.Rect(
-                gs.boss.x,
-                gs.boss.y,
-                gs.boss.width,
-                gs.boss.height
-            )
-
-            if laser_rect.colliderect(boss_rect):
-
-                gs.boss.hp -= gs.bullet_damage_mult
-                gs.boss.hit_timer = 6
-
-                log_hit_enemy()
-
-                spawn_hit_particles(
-                    gs.boss.x + random.randint(10, 70),
-                    gs.boss.y + random.randint(10, 50)
-                )
-
-
     # =========================================================
-    # BULLET COLLISION SYSTEM
+    # BULLET
     # =========================================================
 
     for bullet in gs.bullets[:]:
@@ -165,98 +84,49 @@ def bullet_enemy_collision():
             BULLET_H
         )
 
-        for enemy in gs.enemies[:]:
+        targets = []
+        targets.extend(gs.enemies)
 
-            enemy_rect = pygame.Rect(
-                enemy.x,
-                enemy.y,
-                ENEMY_W,
-                ENEMY_H
-            )
+        if gs.miniboss:
+            targets.append(gs.miniboss)
 
-            if bullet_rect.colliderect(enemy_rect):
+        if gs.boss:
+            targets.append(gs.boss)
 
-                if getattr(enemy, "golden_invulnerable", False):
+        for target in targets[:]:
+
+            w = getattr(target, "width", ENEMY_W)
+            h = getattr(target, "height", ENEMY_H)
+
+            rect = pygame.Rect(target.x, target.y, w, h)
+
+            if bullet_rect.colliderect(rect):
+
+                if getattr(target, "invulnerable", False):
                     continue
 
-                enemy.hp -= bullet.damage
-                enemy.hit_timer = 6
+                request_damage(target, bullet.damage, source="bullet")
 
-                if gs.weapon == "shotgun" and gs.shotgun_knockback > 0:
-                    enemy.y += gs.shotgun_knockback
-
-                log_hit_enemy()
+                if hasattr(target, "hit_timer"):
+                    target.hit_timer = 6
 
                 bullet.pierce -= 1
 
-                if enemy.hp <= 0:
-                    kill_enemy(enemy)
-
-                if bullet.pierce <= 0:
-                    if bullet in gs.bullets:
-                        gs.bullets.remove(bullet)
+                if bullet.pierce <= 0 and bullet in gs.bullets:
+                    gs.bullets.remove(bullet)
 
                 break
 
-        if gs.boss:
-
-            boss_rect = pygame.Rect(
-                gs.boss.x,
-                gs.boss.y,
-                gs.boss.width,
-                gs.boss.height
-            )
-
-            if bullet_rect.colliderect(boss_rect):
-
-                gs.boss.hp -= bullet.damage
-                gs.boss.hit_timer = 6
-
-                log_hit_enemy()
-
-                spawn_hit_particles(
-                    gs.boss.x + random.randint(10, 70),
-                    gs.boss.y + random.randint(10, 50)
-                )
-
-                if bullet in gs.bullets:
-                    gs.bullets.remove(bullet)
-
-        if gs.miniboss:
-
-            miniboss_rect = pygame.Rect(
-                gs.miniboss.x,
-                gs.miniboss.y,
-                gs.miniboss.width,
-                gs.miniboss.height
-            )
-
-            if bullet_rect.colliderect(miniboss_rect):
-
-                gs.miniboss.hp -= bullet.damage
-                log_hit_enemy()
-
-                if gs.miniboss.hp <= 0:
-
-                    from systems.nemesis_system import record_fight
-
-                    stats = gs.miniboss.get_fight_stats()
-                    record_fight(gs.miniboss.profile, stats)
-
-                    gs.miniboss = None
-
-                if bullet in gs.bullets:
-                    gs.bullets.remove(bullet)
-
 
 # =========================================================
-# PLAYER VS ENEMY
+# PLAYER VS ENEMY (AINDA VAI SER REFATORADO)
 # =========================================================
 
 def player_enemy_collision():
 
-    if gs.player_iframes > 0:
-        return False
+    # evita custo desnecessário
+    if not gs.enemies:
+        return
 
     player_rect = pygame.Rect(
         gs.player_x,
@@ -267,6 +137,10 @@ def player_enemy_collision():
 
     for enemy in gs.enemies[:]:
 
+        # evita retrabalho
+        if getattr(enemy, "is_dead", False):
+            continue
+
         enemy_rect = pygame.Rect(
             enemy.x,
             enemy.y,
@@ -274,45 +148,49 @@ def player_enemy_collision():
             ENEMY_H
         )
 
-        if player_rect.colliderect(enemy_rect):
+        if not player_rect.colliderect(enemy_rect):
+            continue
 
-            if getattr(enemy, "is_golden", False):
+        # -------------------------------------------------
+        # GOLDEN (EVENT KILL)
+        # -------------------------------------------------
 
-                spawn_hit_particles(
-                    enemy.x + ENEMY_W // 2,
-                    enemy.y + ENEMY_H // 2
-                )
-
-                if enemy in gs.enemies:
-                    gs.enemies.remove(enemy)
-
-                return False
-
-            log_player_hit()
-            log_player_hp_loss(1)
-
-            gs.player_hp -= 1
-
-            if gs.ammo_on_damage:
-                gs.ammo += 2
-                gs.ammo = min(gs.ammo, gs.max_ammo)
-
-            gs.player_iframes = gs.player_iframe_duration
+        if getattr(enemy, "is_golden", False):
 
             spawn_hit_particles(
                 enemy.x + ENEMY_W // 2,
                 enemy.y + ENEMY_H // 2
             )
 
-            gs.screen_shake = 8
-            gs.screen_shake_power = 6
+            request_damage(enemy, 999, source="event_golden", damage_type="execution")
+            return  # uma colisão por frame já basta
 
-            if enemy in gs.enemies:
-                gs.enemies.remove(enemy)
+        # -------------------------------------------------
+        # PLAYER DAMAGE (PIPELINE)
+        # -------------------------------------------------
 
-            if gs.player_hp <= 0:
-                return True
+        request_damage("player", 1, source="enemy_collision")
 
-            return False
+        # -------------------------------------------------
+        # FEEDBACK VISUAL
+        # -------------------------------------------------
 
-    return False
+        spawn_hit_particles(
+            enemy.x + ENEMY_W // 2,
+            enemy.y + ENEMY_H // 2
+        )
+
+        gs.pending_feedback.append({
+            "type": "shake",
+            "duration": 8,
+            "power": 6
+        })
+
+        # -------------------------------------------------
+        # EVENT KILL (DESIGN)
+        # -------------------------------------------------
+
+        request_damage(enemy, 999, source="event_collision", damage_type="execution")
+
+        # uma colisão por frame evita spam
+        return

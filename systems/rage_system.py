@@ -1,4 +1,3 @@
-import math
 import random
 
 from core import game_state as gs
@@ -6,13 +5,9 @@ from core import game_state as gs
 from systems.particles import spawn_hit_particles
 from entities.pickup import Pickup
 
-from systems.collisions import kill_enemy
-
-from systems.run_logger import (
-    log_rage_trigger,
-    log_rage_kill
-)
-
+from systems.run_logger import log_rage_trigger
+from systems.damage_system import request_damage
+from systems.pickups import request_spawn_pickup
 
 def trigger_rage_explosion(x, y):
 
@@ -20,6 +15,7 @@ def trigger_rage_explosion(x, y):
         return
 
     radius = max(gs.rage_radius, 40)
+    radius_sq = radius * radius
     damage = gs.rage_damage
 
     # -------------------------------------------------
@@ -39,36 +35,31 @@ def trigger_rage_explosion(x, y):
         dx = enemy.x - x
         dy = enemy.y - y
 
-        dist = math.sqrt(dx*dx + dy*dy)
+        dist_sq = dx*dx + dy*dy
 
-        if dist < radius:
+        if dist_sq < radius_sq:
 
-            enemy.hp -= damage
+            # =================================================
+            # DAMAGE (PIPELINE CORRETO)
+            # =================================================
 
-            if enemy.hp <= 0:
+            request_damage(enemy, damage, source="rage")
 
-                log_rage_kill()
+            ex = enemy.x
+            ey = enemy.y
 
-                ex = enemy.x
-                ey = enemy.y
+            # -------------------------------------------------
+            # AMMO DROP
+            # -------------------------------------------------
 
-                # usa sistema central de morte
-                kill_enemy(enemy)
+            if gs.rage_ammo:
+                if random.random() < 0.4:
+                    request_spawn_pickup(ex, ey, "ammo", priority=2)
 
-                # -------------------------------------------------
-                # AMMO DROP
-                # -------------------------------------------------
+            # -------------------------------------------------
+            # CHAIN EXPLOSION
+            # -------------------------------------------------
 
-                if gs.rage_ammo:
-
-                    if random.random() < 0.4:
-                        gs.pickups.append(Pickup(ex, ey, "ammo"))
-
-                # -------------------------------------------------
-                # CHAIN EXPLOSION
-                # -------------------------------------------------
-
-                if gs.rage_chain:
-
-                    if random.random() < 0.35:
-                        trigger_rage_explosion(ex, ey)
+            if gs.rage_chain:
+                if random.random() < 0.35:
+                    trigger_rage_explosion(ex, ey)

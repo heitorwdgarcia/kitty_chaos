@@ -4,28 +4,13 @@ from core import game_state as gs
 from .ui import get_font
 
 
+# =========================================================
+# SPAWN MESSAGE (BURRO — SEM LÓGICA)
+# =========================================================
+
 def spawn_message(text, x, y, color):
 
-    # -------------------------------------------------
-    # COMBO MESSAGE UPDATE (não criar várias)
-    # -------------------------------------------------
-
-    if text.startswith("COMBO"):
-
-        for msg in gs.messages:
-
-            if msg[0].startswith("COMBO"):
-
-                msg[0] = text
-                msg[1] = 60
-                return
-
-    # -------------------------------------------------
-    # NOVA MENSAGEM
-    # -------------------------------------------------
-
     offset_x = random.randint(-20, 20)
-
     stack_offset = len(gs.messages) * 18
 
     gs.messages.append([
@@ -36,6 +21,10 @@ def spawn_message(text, x, y, color):
         color                # 4 color
     ])
 
+
+# =========================================================
+# DRAW MESSAGES
+# =========================================================
 
 def draw_messages(screen):
 

@@ -7,6 +7,7 @@ from systems.weapons import shoot_weapon
 from systems.weapons_data import WEAPONS
 
 from systems.run_logger import log_shot
+from systems.pickups import request_spawn_pickup
 
 
 # =========================================================
@@ -98,15 +99,18 @@ def handle_shooting(keys):
     # EMERGENCY AMMO REGEN (ANTI SOFTLOCK)
     # =========================================================
 
-    if gs.ammo <= 0:
+    # garante existência
+    if not hasattr(gs, "ammo_starve_timer"):
+        gs.ammo_starve_timer = 0
 
-        if not hasattr(gs, "ammo_starve_timer"):
-            gs.ammo_starve_timer = 0
+    if gs.ammo <= 0:
 
         gs.ammo_starve_timer += 1
 
-        # ~3 segundos sem munição
-        if gs.ammo_starve_timer > 180:
+        # 🔥 threshold dinâmico (entra antes se crítico)
+        threshold = 120 if gs.ammo <= 2 else 180
+
+        if gs.ammo_starve_timer > threshold:
 
             # verifica se já existe pickup de ammo na tela
             ammo_pickups = [
@@ -116,14 +120,16 @@ def handle_shooting(keys):
 
             if len(ammo_pickups) == 0:
 
-                from entities.pickup import Pickup
-
-                gs.pickups.append(
-                    Pickup(gs.player_x, gs.player_y - 30, "ammo")
+                request_spawn_pickup(
+                    gs.player_x,
+                    gs.player_y - 30,
+                    "ammo",
+                    priority=999,
+                    force=True   # 🔥 ESSA É A CHAVE
                 )
 
             # cooldown antes de poder spawnar outro
             gs.ammo_starve_timer = -60
 
-    elif gs.ammo > 2:
+    else:
         gs.ammo_starve_timer = 0

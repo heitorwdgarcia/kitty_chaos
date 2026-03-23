@@ -2,7 +2,8 @@ import math
 import random
 
 from core import game_state as gs
-
+from systems.kill_system import request_kill
+from systems.damage_system import request_damage
 
 # =========================================================
 # BASE ENEMY
@@ -47,9 +48,16 @@ class NormalEnemy:
         self.invulnerable = True
 
         # IMPACTO VISUAL
-        gs.hit_stop = 10
-        gs.screen_shake = 20
-        gs.screen_shake_power = 6
+        gs.pending_feedback.append({
+            "type": "hit_stop",
+            "duration": 10
+        })
+
+        gs.pending_feedback.append({
+            "type": "shake",
+            "duration": 20,
+            "power": 6
+        })
 
 
     # =========================================================
@@ -86,8 +94,7 @@ class NormalEnemy:
                         continue
 
                     if abs(e.x - self.x) < 30 and abs(e.y - self.y) < 30:
-                        e.hp = 0  # explode
-
+                        request_damage(e, 999, source="golden_collision")
 
         else:
             # comportamento normal

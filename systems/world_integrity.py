@@ -1,5 +1,4 @@
 from core import game_state as gs
-from ui import spawn_message
 
 def apply_world_damage(amount):
 
@@ -34,11 +33,10 @@ def update_world_integrity():
 
     if ratio < 0.30 and not hasattr(gs, "world_critical_warning"):
 
-        spawn_message(
-            "WORLD CRITICAL",
-            250,
-            500,
-            (255,80,80)
-        )
+        gs.pending_feedback.append({
+            "type": "world_critical",
+            "x": 250,
+            "y": 500
+        })
 
         gs.world_critical_warning = True

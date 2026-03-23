@@ -6,7 +6,7 @@
 import json
 from collections import Counter, defaultdict
 
-FILE = "telemetry_runs.jsonl"
+FILE = r"C:\Users\heito\Documents\Programação\chaos_dodge - v2\telemetry_runs.jsonl"
 OUTPUT = "analysis_report.txt"
 
 
@@ -29,8 +29,8 @@ def load_runs():
 
             try:
                 runs.append(json.loads(line))
-            except:
-                pass
+            except Exception as e:
+                print(f"Erro ao ler run: {e}")
 
     return runs
 
@@ -106,17 +106,19 @@ def analyze(runs):
         if ev:
             death_event[ev] += 1
 
-        times = r.get("stage_time", [])
-        kills = r.get("stage_kills", [])
-        pressure = r.get("spawn_pressure", [])
+        times = r.get("stage_time") or []
+        kills = r.get("stage_kills") or []
+        pressure = r.get("spawn_pressure") or []
 
-        for i in range(len(times)):
+        min_len = min(len(times), len(kills), len(pressure))
+
+        times = times[:min_len]
+        kills = kills[:min_len]
+        pressure = pressure[:min_len]
+
+        for i in range(min_len):
             stage_time[i].append(times[i])
-
-        for i in range(len(kills)):
             stage_kills[i].append(kills[i])
-
-        for i in range(len(pressure)):
             stage_pressure[i].append(pressure[i])
 
         for up in r.get("upgrades_taken", []):
@@ -290,6 +292,78 @@ if __name__ == "__main__":
 ================================================================================
 ./dump_scripts.py
 ================================================================================
+
+# Quero uma auditoria completa deste código.
+
+# Siga exatamente este processo:
+
+# 1. Entender o papel do arquivo dentro do sistema
+# 2. Mapear dependências (quem chama / quem usa)
+# 3. Avaliar impacto na arquitetura geral do jogo
+# 4. Identificar problemas antes de sugerir mudanças
+
+# ---
+
+# Analise obrigatoriamente:
+
+# ### 1. Bugs e problemas reais
+# - lógica incorreta
+# - edge cases
+# - comportamento inconsistente
+# - possíveis crashes
+# - problemas de timing / múltiplas execuções
+
+# ### 2. Arquitetura
+# - responsabilidade do arquivo está correta?
+# - está violando autoridade de sistemas?
+# - lógica deveria estar em outro lugar?
+# - está acoplado demais?
+
+# ### 3. Duplicação e redundância
+# - código repetido
+# - variáveis duplicadas
+# - lógica que deveria ser centralizada
+
+# ### 4. Fluxo de dados (MUITO IMPORTANTE)
+# - dados estão vindo de onde?
+# - estão sendo modificados em múltiplos lugares?
+# - existe risco de estado inconsistente?
+
+# ### 5. Autoridade de sistemas
+# Verificar se respeita:
+# - spawn → spawn.py
+# - morte → kill_enemy()
+# - run end → run_director
+# - telemetria → run_logger
+
+# ### 6. Performance
+# - loops desnecessários
+# - operações caras
+# - crescimento de listas
+# - risco em runs longas (bot 1000 runs)
+
+# ### 7. Telemetria
+# - dados importantes não sendo registrados?
+# - dados inconsistentes?
+# - métricas quebradas?
+
+# ### 8. Game Design (alinhado ao GDD)
+# - isso quebra pacing da run?
+# - afeta near miss?
+# - afeta caos controlado?
+# - afeta duração (~5 min)?
+
+# ---
+
+# Formato da resposta:
+
+# 1. Problemas encontrados (priorizados)
+# 2. Explicação do impacto (técnico + gameplay)
+# 3. Plano de correção (antes de codar)
+
+# NÃO implementar ainda.
+# Quero primeiro o diagnóstico completo.
+
 
 import os
 
@@ -842,28 +916,13 @@ from core import game_state as gs
 from .ui import get_font
 
 
+# =========================================================
+# SPAWN MESSAGE (BURRO — SEM LÓGICA)
+# =========================================================
+
 def spawn_message(text, x, y, color):
 
-    # -------------------------------------------------
-    # COMBO MESSAGE UPDATE (não criar várias)
-    # -------------------------------------------------
-
-    if text.startswith("COMBO"):
-
-        for msg in gs.messages:
-
-            if msg[0].startswith("COMBO"):
-
-                msg[0] = text
-                msg[1] = 60
-                return
-
-    # -------------------------------------------------
-    # NOVA MENSAGEM
-    # -------------------------------------------------
-
     offset_x = random.randint(-20, 20)
-
     stack_offset = len(gs.messages) * 18
 
     gs.messages.append([
@@ -874,6 +933,10 @@ def spawn_message(text, x, y, color):
         color                # 4 color
     ])
 
+
+# =========================================================
+# DRAW MESSAGES
+# =========================================================
 
 def draw_messages(screen):
 
@@ -988,7 +1051,7 @@ def draw_entities(screen, offset_x=0, offset_y=0):
             # FLASH IF INVULNERABLE
             # -------------------------------------------------
 
-            if getattr(e, "golden_invulnerable", False):
+            if getattr(e, "invulnerable", False):
 
                 if int(phase * 6) % 2 == 0:
                     color = (255,255,200)
@@ -1325,22 +1388,21 @@ from systems.player_combat import handle_shooting
 from systems.boss_logic import update_boss
 from systems.run_director import update_run_director
 from systems.world_integrity import update_world_integrity
+from systems.feedback_system import process_feedback
 from systems.run_state_controller import update_run_state
 from systems.bot_manager import update_bot_manager
 from systems.run_initializer import start_run
 from systems.combat_system import update_combat
-
-
+from systems.damage_system import process_damage
+from systems.kill_system import process_kills
+from systems.pickups import process_pickup_spawns
 
 
 def update_run_flow(keys):
 
-    # trava durante reward
     if gs.reward_active:
 
-        # BOT AUTO PICK
         if gs.bot_mode:
-
             from systems.reward_system import choose_reward
 
             if gs.reward_choices:
@@ -1348,68 +1410,54 @@ def update_run_flow(keys):
 
         return True
 
-    # timer
     gs.run_timer += 1
 
-    # i-frames
     if gs.player_iframes > 0:
         gs.player_iframes -= 1
 
-    # estado da run (morte etc)
     if update_run_state():
         return True
 
     return False
 
+
 def update_entities(keys):
 
-    # player
     update_player()
-
-    # combate
     update_combat(keys)
-
-    # entidades
     move_enemies()
-
-    # dodge
     update_dodge()
+
+    process_damage()
+    process_kills()
 
 
 def update_effects():
 
-    # sistemas secundários
+    # 🔥 ORDEM CRÍTICA (mantida)
     update_combo()
+    process_pickup_spawns()
     update_particles()
     update_pickups()
 
-    # câmera
     update_camera()
-
-# =========================================================
-# UPDATE WORLD
-# =========================================================
+    process_feedback()
 
 def update_world():
 
-    # director
     update_run_director()
-
-    # bosses
     update_boss()
 
     if gs.miniboss:
         gs.miniboss.update()
 
-    # mundo
     update_world_integrity()
 
 
-# =========================================================
-# UPDATE RUN
-# =========================================================
-
 def update_run(keys):
+
+    # 🔥 RESET ANTI-SPAM (ESSENCIAL)
+    gs.ammo_spawned_this_frame = 0
 
     if update_run_flow(keys):
         return
@@ -1419,28 +1467,19 @@ def update_run(keys):
     update_effects()
 
 
-# =========================================================
-# UPDATE (ENTRY POINT)
-# =========================================================
-
 def update(keys):
 
-    # HIT STOP
     if gs.hit_stop > 0:
         gs.hit_stop -= 1
         return "hit_stop"
 
-    # start run request
     if gs.start_requested:
         gs.start_requested = False
-
-        from systems.run_initializer import start_run
         start_run()
 
     if gs.game_state == "run":
         update_run(keys)
 
-    # BOT MANAGER (fora da run)
     update_bot_manager(start_run)
 
 
@@ -1609,13 +1648,16 @@ class World:
         self.bullets = []
         self.particles = []
         self.pickups = []
+        
+        # ---------------- PICKUP SYSTEM ----------------
 
+        self.pending_pickups = []
         # ---------------- WEAPON ----------------
 
         self.weapon = "pistol"
 
         # ---------------- AMMO ----------------
-
+        
         self.ammo = 5
         self.max_ammo = 5
 
@@ -1755,6 +1797,10 @@ class World:
         # ---------------- UI ----------------
 
         self.messages = []
+        
+        # ---------------- FEEDBACK SYSTEM ----------------
+        
+        self.pending_feedback = []
 
         # ---------------- PLAYER STATS ----------------
 
@@ -1772,6 +1818,10 @@ class World:
         # ---------------- SAFETY ----------------
 
         self.ammo_starve_timer = 0
+        
+        # ---------------- DROP CONTROL ----------------
+
+        self.ammo_spawned_this_frame = 0
 
         # ---------------- RUN PROGRESSION ----------------
 
@@ -2117,14 +2167,6 @@ def update_boss():
 
         spawn_minions(boss)
 
-    # ---------------------------------
-    # BOSS MORRE
-    # ---------------------------------
-
-    if boss.hp <= 0:
-
-        gs.boss = None
-
 
 def spawn_minions(boss):
 
@@ -2299,7 +2341,7 @@ from core import game_state as gs
 from settings import *
 
 from systems.particles import spawn_hit_particles
-from ui import spawn_message
+
 
 from systems.run_logger import (
     log_kill,
@@ -2308,48 +2350,8 @@ from systems.run_logger import (
     log_player_hp_loss
 )
 
-from systems.drop_system import enemy_drop
+from systems.damage_system import request_damage
 
-
-# =========================================================
-# KILL ENEMY
-# =========================================================
-
-def kill_enemy(enemy):
-
-    cx = enemy.x + ENEMY_W // 2
-    cy = enemy.y + ENEMY_H // 2
-
-    enemy_drop(enemy)
-
-    if getattr(enemy, "is_golden", False):
-
-        from systems.reward_system import spawn_chest
-        spawn_chest()
-
-    spawn_hit_particles(cx, cy)
-
-    gs.kills += 1
-    log_kill()
-
-    gs.chaos += 0.3
-
-    gs.combo += 1
-    gs.combo_timer = int(60 * gs.combo_duration_mult)
-
-    if gs.combo >= 2:
-        spawn_message(
-            f"COMBO x{gs.combo}",
-            cx,
-            cy - 20,
-            (255, 220, 120)
-        )
-
-    from systems.combo import combo_reward
-    combo_reward()
-
-    if enemy in gs.enemies:
-        gs.enemies.remove(enemy)
 
 
 # =========================================================
@@ -2359,7 +2361,7 @@ def kill_enemy(enemy):
 def bullet_enemy_collision():
 
     # =========================================================
-    # LASER COLLISION SYSTEM
+    # LASER
     # =========================================================
 
     if gs.laser_active:
@@ -2373,27 +2375,31 @@ def bullet_enemy_collision():
             gs.laser_length
         )
 
-        for enemy in gs.enemies[:]:
+        targets = []
+        targets.extend(gs.enemies)
 
-            enemy_rect = pygame.Rect(
-                enemy.x,
-                enemy.y,
-                ENEMY_W,
-                ENEMY_H
-            )
+        if gs.miniboss:
+            targets.append(gs.miniboss)
 
-            if laser_rect.colliderect(enemy_rect):
+        if gs.boss:
+            targets.append(gs.boss)
 
-                if getattr(enemy, "golden_invulnerable", False):
+        for target in targets[:]:
+
+            w = getattr(target, "width", ENEMY_W)
+            h = getattr(target, "height", ENEMY_H)
+
+            rect = pygame.Rect(target.x, target.y, w, h)
+
+            if laser_rect.colliderect(rect):
+
+                if getattr(target, "invulnerable", False):
                     continue
 
-                enemy.hp -= gs.bullet_damage_mult
-                enemy.hit_timer = 6
+                request_damage(target, gs.bullet_damage_mult, source="laser")
 
-                log_hit_enemy()
-
-                if enemy.hp <= 0:
-                    kill_enemy(enemy)
+                if hasattr(target, "hit_timer"):
+                    target.hit_timer = 6
 
                 pierce_left -= 1
 
@@ -2401,53 +2407,8 @@ def bullet_enemy_collision():
                     gs.laser_active = False
                     break
 
-        if gs.miniboss:
-
-            miniboss_rect = pygame.Rect(
-                gs.miniboss.x,
-                gs.miniboss.y,
-                gs.miniboss.width,
-                gs.miniboss.height
-            )
-
-            if laser_rect.colliderect(miniboss_rect):
-
-                gs.miniboss.hp -= gs.bullet_damage_mult
-                log_hit_enemy()
-
-                if gs.miniboss.hp <= 0:
-
-                    from systems.nemesis_system import record_fight
-
-                    stats = gs.miniboss.get_fight_stats()
-                    record_fight(gs.miniboss.profile, stats)
-
-                    gs.miniboss = None
-
-        if gs.boss:
-
-            boss_rect = pygame.Rect(
-                gs.boss.x,
-                gs.boss.y,
-                gs.boss.width,
-                gs.boss.height
-            )
-
-            if laser_rect.colliderect(boss_rect):
-
-                gs.boss.hp -= gs.bullet_damage_mult
-                gs.boss.hit_timer = 6
-
-                log_hit_enemy()
-
-                spawn_hit_particles(
-                    gs.boss.x + random.randint(10, 70),
-                    gs.boss.y + random.randint(10, 50)
-                )
-
-
     # =========================================================
-    # BULLET COLLISION SYSTEM
+    # BULLET
     # =========================================================
 
     for bullet in gs.bullets[:]:
@@ -2459,98 +2420,49 @@ def bullet_enemy_collision():
             BULLET_H
         )
 
-        for enemy in gs.enemies[:]:
+        targets = []
+        targets.extend(gs.enemies)
 
-            enemy_rect = pygame.Rect(
-                enemy.x,
-                enemy.y,
-                ENEMY_W,
-                ENEMY_H
-            )
+        if gs.miniboss:
+            targets.append(gs.miniboss)
 
-            if bullet_rect.colliderect(enemy_rect):
+        if gs.boss:
+            targets.append(gs.boss)
 
-                if getattr(enemy, "golden_invulnerable", False):
+        for target in targets[:]:
+
+            w = getattr(target, "width", ENEMY_W)
+            h = getattr(target, "height", ENEMY_H)
+
+            rect = pygame.Rect(target.x, target.y, w, h)
+
+            if bullet_rect.colliderect(rect):
+
+                if getattr(target, "invulnerable", False):
                     continue
 
-                enemy.hp -= bullet.damage
-                enemy.hit_timer = 6
+                request_damage(target, bullet.damage, source="bullet")
 
-                if gs.weapon == "shotgun" and gs.shotgun_knockback > 0:
-                    enemy.y += gs.shotgun_knockback
-
-                log_hit_enemy()
+                if hasattr(target, "hit_timer"):
+                    target.hit_timer = 6
 
                 bullet.pierce -= 1
 
-                if enemy.hp <= 0:
-                    kill_enemy(enemy)
-
-                if bullet.pierce <= 0:
-                    if bullet in gs.bullets:
-                        gs.bullets.remove(bullet)
+                if bullet.pierce <= 0 and bullet in gs.bullets:
+                    gs.bullets.remove(bullet)
 
                 break
 
-        if gs.boss:
-
-            boss_rect = pygame.Rect(
-                gs.boss.x,
-                gs.boss.y,
-                gs.boss.width,
-                gs.boss.height
-            )
-
-            if bullet_rect.colliderect(boss_rect):
-
-                gs.boss.hp -= bullet.damage
-                gs.boss.hit_timer = 6
-
-                log_hit_enemy()
-
-                spawn_hit_particles(
-                    gs.boss.x + random.randint(10, 70),
-                    gs.boss.y + random.randint(10, 50)
-                )
-
-                if bullet in gs.bullets:
-                    gs.bullets.remove(bullet)
-
-        if gs.miniboss:
-
-            miniboss_rect = pygame.Rect(
-                gs.miniboss.x,
-                gs.miniboss.y,
-                gs.miniboss.width,
-                gs.miniboss.height
-            )
-
-            if bullet_rect.colliderect(miniboss_rect):
-
-                gs.miniboss.hp -= bullet.damage
-                log_hit_enemy()
-
-                if gs.miniboss.hp <= 0:
-
-                    from systems.nemesis_system import record_fight
-
-                    stats = gs.miniboss.get_fight_stats()
-                    record_fight(gs.miniboss.profile, stats)
-
-                    gs.miniboss = None
-
-                if bullet in gs.bullets:
-                    gs.bullets.remove(bullet)
-
 
 # =========================================================
-# PLAYER VS ENEMY
+# PLAYER VS ENEMY (AINDA VAI SER REFATORADO)
 # =========================================================
 
 def player_enemy_collision():
 
-    if gs.player_iframes > 0:
-        return False
+    # evita custo desnecessário
+    if not gs.enemies:
+        return
 
     player_rect = pygame.Rect(
         gs.player_x,
@@ -2561,6 +2473,10 @@ def player_enemy_collision():
 
     for enemy in gs.enemies[:]:
 
+        # evita retrabalho
+        if getattr(enemy, "is_dead", False):
+            continue
+
         enemy_rect = pygame.Rect(
             enemy.x,
             enemy.y,
@@ -2568,48 +2484,52 @@ def player_enemy_collision():
             ENEMY_H
         )
 
-        if player_rect.colliderect(enemy_rect):
+        if not player_rect.colliderect(enemy_rect):
+            continue
 
-            if getattr(enemy, "is_golden", False):
+        # -------------------------------------------------
+        # GOLDEN (EVENT KILL)
+        # -------------------------------------------------
 
-                spawn_hit_particles(
-                    enemy.x + ENEMY_W // 2,
-                    enemy.y + ENEMY_H // 2
-                )
-
-                if enemy in gs.enemies:
-                    gs.enemies.remove(enemy)
-
-                return False
-
-            log_player_hit()
-            log_player_hp_loss(1)
-
-            gs.player_hp -= 1
-
-            if gs.ammo_on_damage:
-                gs.ammo += 2
-                gs.ammo = min(gs.ammo, gs.max_ammo)
-
-            gs.player_iframes = gs.player_iframe_duration
+        if getattr(enemy, "is_golden", False):
 
             spawn_hit_particles(
                 enemy.x + ENEMY_W // 2,
                 enemy.y + ENEMY_H // 2
             )
 
-            gs.screen_shake = 8
-            gs.screen_shake_power = 6
+            request_damage(enemy, 999, source="event_golden", damage_type="execution")
+            return  # uma colisão por frame já basta
 
-            if enemy in gs.enemies:
-                gs.enemies.remove(enemy)
+        # -------------------------------------------------
+        # PLAYER DAMAGE (PIPELINE)
+        # -------------------------------------------------
 
-            if gs.player_hp <= 0:
-                return True
+        request_damage("player", 1, source="enemy_collision")
 
-            return False
+        # -------------------------------------------------
+        # FEEDBACK VISUAL
+        # -------------------------------------------------
 
-    return False
+        spawn_hit_particles(
+            enemy.x + ENEMY_W // 2,
+            enemy.y + ENEMY_H // 2
+        )
+
+        gs.pending_feedback.append({
+            "type": "shake",
+            "duration": 8,
+            "power": 6
+        })
+
+        # -------------------------------------------------
+        # EVENT KILL (DESIGN)
+        # -------------------------------------------------
+
+        request_damage(enemy, 999, source="event_collision", damage_type="execution")
+
+        # uma colisão por frame evita spam
+        return
 
 
 ================================================================================
@@ -2645,18 +2565,16 @@ def update_combat(keys):
 ================================================================================
 
 from core import game_state as gs
+from systems.pickups import request_spawn_pickup
 
 
 def update_combo():
 
     if gs.combo_timer > 0:
-
         gs.combo_timer -= 1
-
     else:
-
         gs.combo = 0
-
+        gs._last_combo_shown = 0
 
 def combo_reward():
 
@@ -2678,16 +2596,156 @@ def combo_reward():
         reward += 2 + gs.combo // 5
 
     if reward > 0:
-        
-        reward = min(reward, 3)
 
-        from entities.pickup import Pickup
+        # 🔥 HARD CAP (evita flood de request)
+        reward = min(reward, 1)
 
         for i in range(reward):
 
-            gs.pickups.append(
-                Pickup(gs.player_x + i * 10, gs.player_y - 40, "ammo")
+            request_spawn_pickup(
+                gs.player_x,
+                gs.player_y - 40,
+                "ammo",
+                priority=3,
+                offset=i * 10
             )
+
+
+================================================================================
+./systems/damage_system.py
+================================================================================
+
+from core import game_state as gs
+from systems.kill_system import request_kill
+from systems.run_logger import log_hit_enemy
+
+# =========================================================
+# REQUEST
+# =========================================================
+
+def request_damage(target, amount, source=None, damage_type="generic"):
+
+    if not hasattr(gs, "pending_damage"):
+        gs.pending_damage = []
+
+    gs.pending_damage.append({
+        "target": target,
+        "amount": amount,
+        "source": source,
+        "damage_type": damage_type  # ✅ NOVO
+    })
+
+
+# =========================================================
+# PROCESS
+# =========================================================
+
+def process_damage():
+
+    if not hasattr(gs, "pending_damage"):
+        return
+
+    for d in gs.pending_damage:
+
+        target = d["target"]
+        amount = d["amount"]
+        source = d["source"]
+        damage_type = d.get("damage_type", "generic")  # ✅ NOVO
+
+        # alvo inválido
+        if target is None:
+            continue
+
+        # =================================================
+        # PLAYER DAMAGE
+        # =================================================
+
+        if target == "player":
+
+            # iframe
+            if gs.player_iframes > 0:
+                continue
+
+            from systems.run_logger import log_player_hit, log_player_hp_loss
+
+            log_player_hp_loss(amount)
+
+            gs.player_hp -= amount
+
+            # clamp segurança
+            if gs.player_hp < 0:
+                gs.player_hp = 0
+
+            # efeitos on hit
+            if gs.ammo_on_damage:
+                gs.ammo = min(gs.ammo + 2, gs.max_ammo)
+
+            # ativa iframe
+            gs.player_iframes = gs.player_iframe_duration
+
+            # morte do player
+            if gs.player_hp <= 0:
+                from systems.run_director import request_end_run
+                request_end_run("player_damage")
+
+            continue
+
+        # =================================================
+        # ENEMY DAMAGE
+        # =================================================
+
+        # já morreu → ignora
+        if getattr(target, "is_dead", False):
+            continue
+
+        if hasattr(target, "hp"):
+            if damage_type == "execution":
+                target.hp = 0
+            else:
+                target.hp -= amount
+
+            on_hit(target, amount, source, damage_type)  # ✅ ALTERADO
+
+            # clamp segurança
+            if target.hp < 0:
+                target.hp = 0
+
+            # -------------------------------------------------
+            # REQUEST KILL (AUTORIDADE)
+            # -------------------------------------------------
+
+            if target.hp <= 0:
+                request_kill(target, source=source)
+
+    # limpa fila
+    gs.pending_damage.clear()
+
+
+# =========================================================
+# HIT EVENT
+# =========================================================
+
+def on_hit(target, amount, source, damage_type):  # ✅ ALTERADO
+
+    from core import game_state as gs
+
+    # ---------------------------------
+    # PLAYER HIT
+    # ---------------------------------
+    if target == "player":
+        return
+
+    # ---------------------------------
+    # ENEMY HIT
+    # ---------------------------------
+
+    log_hit_enemy()
+
+    # 🔥 FUTURO:
+    # if damage_type == "crit":
+    #     spawn_crit_effect()
+
+    # spawn_hit_particles(target.x, target.y)
 
 
 ================================================================================
@@ -2748,11 +2806,11 @@ def handle_debug_input(event, start_run):
 
 from core import game_state as gs
 from settings import *
-from ui import spawn_message
 
 from systems.rage_system import trigger_rage_explosion
 from systems.run_logger import log_near_miss, log_world_damage
 from systems.world_integrity import apply_world_damage
+from systems.damage_system import request_damage
 
 def update_dodge():
 
@@ -2777,12 +2835,11 @@ def update_dodge():
                 if gs.near_miss_ammo:
                     gs.ammo = min(gs.ammo + 1, gs.max_ammo)
 
-                spawn_message(
-                    "NEAR MISS",
-                    enemy.x,
-                    enemy.y,
-                    (255,220,120)
-                )
+                gs.pending_feedback.append({
+                    "type": "near_miss",
+                    "x": enemy.x,
+                    "y": enemy.y
+                })
 
                 if gs.rage_level > 0:
 
@@ -2800,8 +2857,11 @@ def update_dodge():
 
                 gs.world_leak_counter += 1
 
-            if enemy in gs.enemies:
-                gs.enemies.remove(enemy)
+
+            if getattr(enemy, "is_dead", False):
+                continue
+            
+            request_damage(enemy, 999, source="event_dodge", damage_type="execution")
 
 
 ================================================================================
@@ -2810,12 +2870,12 @@ def update_dodge():
 
 import random
 
-from entities.pickup import Pickup
 from core import game_state as gs
+from systems.pickups import request_spawn_pickup
 
 
 # =========================================================
-# ENEMY DROP SYSTEM
+# ENEMY DROP SYSTEM (AGORA SÓ FAZ REQUEST)
 # =========================================================
 
 def enemy_drop(enemy):
@@ -2823,53 +2883,49 @@ def enemy_drop(enemy):
     x = enemy.x
     y = enemy.y
 
-    ammo_chance = 0.18 + gs.ammo_drop_bonus
+    # -------------------------------------------------
+    # CONFIG
+    # -------------------------------------------------
+
     gem_chance = 0.08
+    ammo_chance = 0.12  # 🔥 NOVO: estabilidade básica de ammo
 
     # -------------------------------------------------
-    # DURANTE BOSS FIGHT → mais ammo
-    # -------------------------------------------------
-
-    if gs.boss:
-        ammo_chance = 0.30
-
-    # -------------------------------------------------
-    # MINIBOSS DROP (sempre dropa)
+    # MINIBOSS DROP (SEMPRE DROP)
     # -------------------------------------------------
 
     if getattr(enemy, "is_miniboss", False):
 
-        # gem garantida
-        gs.pickups.append(Pickup(x, y, "gem"))
+        request_spawn_pickup(x, y, "gem", priority=1)
+        request_spawn_pickup(x + 12, y, "ammo", priority=4)
 
-        # ammo garantida
-        gs.pickups.append(Pickup(x + 12, y, "ammo"))
-
-        # double pickups upgrade
-        if gs.double_pickups:
-
-            gs.pickups.append(Pickup(x + 6, y, "gem"))
-            gs.pickups.append(Pickup(x + 18, y, "ammo"))
+        if getattr(gs, "double_pickups", False):
+            request_spawn_pickup(x + 6, y, "gem", priority=1)
+            request_spawn_pickup(x + 18, y, "ammo", priority=4)
 
         return
 
     # -------------------------------------------------
-    # NORMAL ENEMY DROPS
+    # GEM DROP (MANTÉM RNG SIMPLES)
+    # -------------------------------------------------
+
+    if random.random() < gem_chance:
+
+        request_spawn_pickup(x + 8, y, "gem", priority=1)
+
+        if getattr(gs, "double_pickups", False):
+            request_spawn_pickup(x + 14, y, "gem", priority=1)
+
+    # -------------------------------------------------
+    # AMMO DROP (NOVO - LEVE)
     # -------------------------------------------------
 
     if random.random() < ammo_chance:
 
-        gs.pickups.append(Pickup(x, y, "ammo"))
+        request_spawn_pickup(x + 10, y, "ammo", priority=2)
 
-        if gs.double_pickups:
-            gs.pickups.append(Pickup(x + 6, y, "ammo"))
-
-    if random.random() < gem_chance:
-
-        gs.pickups.append(Pickup(x + 8, y, "gem"))
-
-        if gs.double_pickups:
-            gs.pickups.append(Pickup(x + 14, y, "gem"))
+        if getattr(gs, "double_pickups", False):
+            request_spawn_pickup(x + 16, y, "ammo", priority=2)
 
 
 ================================================================================
@@ -2893,6 +2949,222 @@ def move_enemies():
 
     for e in gs.enemies:
         e.update(enemy_speed)
+
+
+================================================================================
+./systems/feedback_system.py
+================================================================================
+
+from core import game_state as gs
+from ui import spawn_message
+
+
+def process_feedback():
+
+    if not hasattr(gs, "pending_feedback"):
+        return
+
+    for e in gs.pending_feedback:
+
+        etype = e.get("type")
+
+        # ---------------- COMBO ----------------
+        if etype == "combo":
+
+            spawn_message(
+                f"COMBO {e['value']}x",
+                e["x"],
+                e["y"],
+                (255,255,120)
+            )
+
+        # ---------------- NEAR MISS ----------------
+        elif etype == "near_miss":
+
+            spawn_message(
+                "NEAR MISS",
+                e["x"],
+                e["y"],
+                (255,220,120)
+            )
+
+        # ---------------- WORLD CRITICAL ----------------
+        elif etype == "world_critical":
+
+            spawn_message(
+                "WORLD CRITICAL",
+                e["x"],
+                e["y"],
+                (255,80,80)
+            )
+
+        # ---------------- FX ----------------
+        elif etype == "shake":
+
+            gs.screen_shake = max(gs.screen_shake, e.get("duration", 5))
+            gs.screen_shake_power = max(gs.screen_shake_power, e.get("power", 5))
+
+        elif etype == "hit_stop":
+
+            gs.hit_stop = max(gs.hit_stop, e.get("duration", 5))
+
+    gs.pending_feedback.clear()
+
+
+================================================================================
+./systems/kill_system.py
+================================================================================
+
+from core import game_state as gs
+
+from systems.drop_system import enemy_drop
+from systems.particles import spawn_hit_particles
+from systems.run_logger import log_kill, log_rage_kill
+from systems.combo import combo_reward
+from systems.reward_system import spawn_chest
+
+# =========================================================
+# REQUEST
+# =========================================================
+
+def request_kill(enemy, source="unknown"):
+
+    if not hasattr(gs, "pending_kills"):
+        gs.pending_kills = []
+
+    gs.pending_kills.append({
+        "enemy": enemy,
+        "source": source
+    })
+
+
+# =========================================================
+# PROCESS
+# =========================================================
+
+def process_kills():
+
+    if not hasattr(gs, "pending_kills"):
+        return
+
+    for k in gs.pending_kills:
+
+        enemy = k["enemy"]
+        source = k["source"]
+
+        # evitar double kill
+        if getattr(enemy, "is_dead", False):
+            continue
+
+        handle_death(enemy, source)
+
+    gs.pending_kills.clear()
+
+
+# =========================================================
+# REMOVE (AUTORIDADE CENTRAL)
+# =========================================================
+
+def remove_enemy(enemy):
+
+    # enemy normal
+    if enemy in gs.enemies:
+        gs.enemies.remove(enemy)
+        return
+
+    # miniboss
+    if gs.miniboss is enemy:
+
+        from systems.nemesis_system import record_fight
+
+        stats = enemy.get_fight_stats()
+        record_fight(enemy.profile, stats)
+
+        gs.miniboss = None
+        return
+
+    # boss
+    if gs.boss is enemy:
+        gs.boss = None
+        return
+
+
+# =========================================================
+# PIPELINE CENTRAL
+# =========================================================
+
+def handle_death(enemy, source):
+
+    enemy.is_dead = True
+    # -------------------------------------------------
+    # POSIÇÃO
+    # -------------------------------------------------
+
+    cx = enemy.x + 20
+    cy = enemy.y + 20
+
+    # -------------------------------------------------
+    # DROP
+    # -------------------------------------------------
+
+    enemy_drop(enemy)
+
+    # -------------------------------------------------
+    # GOLDEN REWARD
+    # -------------------------------------------------
+
+    if getattr(enemy, "is_golden", False):
+        spawn_chest()
+
+    # -------------------------------------------------
+    # FX
+    # -------------------------------------------------
+
+    spawn_hit_particles(cx, cy)
+
+    # -------------------------------------------------
+    # STATS
+    # -------------------------------------------------
+
+    gs.kills += 1
+    log_kill()
+
+    # -------------------------------------------------
+    # RAGE TELEMETRY (CENTRALIZADO)
+    # -------------------------------------------------
+
+    if source == "rage":
+        
+        log_rage_kill()
+
+    # -------------------------------------------------
+    # CHAOS
+    # -------------------------------------------------
+
+    gs.chaos += 0.3
+
+    # -------------------------------------------------
+    # COMBO
+    # -------------------------------------------------
+
+    gs.combo += 1
+    gs.combo_timer = int(60 * gs.combo_duration_mult)
+
+    if gs.combo >= 2:
+
+        gs.pending_feedback.append({
+            "type": "combo",
+            "value": gs.combo,
+            "x": cx,
+            "y": cy
+        })
+    combo_reward()
+
+    # -------------------------------------------------
+    # REMOVE (SEMPRE ÚLTIMO)
+    # -------------------------------------------------
+
+    remove_enemy(enemy)
 
 
 ================================================================================
@@ -3117,7 +3389,8 @@ def update_particles():
 
 import pygame
 import math
-
+import random
+from entities.pickup import Pickup
 from core import game_state as gs
 from settings import *
 
@@ -3128,6 +3401,24 @@ from systems.run_logger import (
 
 from meta.rewards import reward_gems
 
+# =========================================================
+# REQUEST SYSTEM (CENTRALIZA SPAWN)
+# =========================================================
+
+def request_spawn_pickup(x, y, kind, priority=1, offset=0, force=False):
+
+    # segurança (caso algo chame antes do world iniciar)
+    if not hasattr(gs, "pending_pickups"):
+        gs.pending_pickups = []
+
+    gs.pending_pickups.append({
+        "x": x,
+        "y": y,
+        "kind": kind,
+        "priority": priority,
+        "offset": offset,
+        "force": force
+    })
 
 def update_pickups():
 
@@ -3214,6 +3505,132 @@ def update_pickups():
 
             gs.pickups.remove(p)
 
+# =========================================================
+# CENTRAL SPAWN PROCESSOR (CÉREBRO)
+# =========================================================
+
+def process_pickup_spawns():
+
+    if not hasattr(gs, "pending_pickups"):
+        return
+
+    if not gs.pending_pickups:
+        return
+
+    # =====================================================
+    # 1. SEPARAR REQUESTS
+    # =====================================================
+
+    requests = gs.pending_pickups
+
+    force_requests = [r for r in requests if r.get("force")]
+    normal_requests = [r for r in requests if not r.get("force")]
+
+    # =====================================================
+    # 2. PROCESSAR FORCE (ANTI-SOFTLOCK)
+    # =====================================================
+
+    for r in force_requests:
+
+        x = r["x"]
+        y = r["y"]
+        kind = r["kind"]
+        offset = r.get("offset", 0)
+
+        gs.pickups.append(Pickup(x + offset, y, kind))
+
+    # =====================================================
+    # 3. CALCULAR ESTADO (AMMO)
+    # =====================================================
+
+    ammo_on_ground = sum(
+        1 for p in gs.pickups
+        if getattr(p, "kind", None) == "ammo"
+    )
+
+    AMMO_VALUE = 5
+
+    ammo_effective = gs.ammo + (ammo_on_ground * AMMO_VALUE)
+
+    max_ammo = max(1, gs.max_ammo)
+    missing_ammo = max_ammo - ammo_effective
+
+    # =====================================================
+    # 4. SE NÃO PRECISA, ENCERRA
+    # =====================================================
+
+    if missing_ammo <= 0:
+        gs.pending_pickups.clear()
+        return
+
+    # =====================================================
+    # 5. BUDGET
+    # =====================================================
+
+    spawn_budget = max(0, int(missing_ammo / AMMO_VALUE))
+
+    if spawn_budget <= 0:
+        gs.pending_pickups.clear()
+        return
+
+    # =====================================================
+    # 6. PRIORIDADE
+    # =====================================================
+
+    requests = sorted(
+        normal_requests,
+        key=lambda r: r.get("priority", 1),
+        reverse=True
+    )
+
+    # =====================================================
+    # 7. CHANCE
+    # =====================================================
+
+    need_ratio = missing_ammo / max_ammo
+
+    spawn_chance = 0.25 + (need_ratio * 0.6)
+    spawn_chance = min(0.95, max(0.05, spawn_chance))
+
+    # =====================================================
+    # 8. PROCESSAR REQUESTS NORMAIS
+    # =====================================================
+
+    for r in requests:
+
+        kind = r["kind"]
+
+        # ---------------- AMMO ----------------
+
+        if kind == "ammo":
+
+            if spawn_budget > 0 and random.random() <= spawn_chance:
+
+                x = r["x"]
+                y = r["y"]
+                offset = r.get("offset", 0)
+
+                gs.pickups.append(Pickup(x + offset, y, "ammo"))
+
+                spawn_budget -= 1
+
+        # ---------------- OUTROS ----------------
+
+        else:
+
+            x = r["x"]
+            y = r["y"]
+            offset = r.get("offset", 0)
+
+            gs.pickups.append(Pickup(x + offset, y, kind))
+
+    # =====================================================
+    # 9. LIMPAR FILA (FRAME-BASED)
+    # =====================================================
+
+    gs.pending_pickups.clear()
+
+
 
 ================================================================================
 ./systems/player_combat.py
@@ -3228,6 +3645,7 @@ from systems.weapons import shoot_weapon
 from systems.weapons_data import WEAPONS
 
 from systems.run_logger import log_shot
+from systems.pickups import request_spawn_pickup
 
 
 # =========================================================
@@ -3319,15 +3737,18 @@ def handle_shooting(keys):
     # EMERGENCY AMMO REGEN (ANTI SOFTLOCK)
     # =========================================================
 
-    if gs.ammo <= 0:
+    # garante existência
+    if not hasattr(gs, "ammo_starve_timer"):
+        gs.ammo_starve_timer = 0
 
-        if not hasattr(gs, "ammo_starve_timer"):
-            gs.ammo_starve_timer = 0
+    if gs.ammo <= 0:
 
         gs.ammo_starve_timer += 1
 
-        # ~3 segundos sem munição
-        if gs.ammo_starve_timer > 180:
+        # 🔥 threshold dinâmico (entra antes se crítico)
+        threshold = 120 if gs.ammo <= 2 else 180
+
+        if gs.ammo_starve_timer > threshold:
 
             # verifica se já existe pickup de ammo na tela
             ammo_pickups = [
@@ -3337,16 +3758,18 @@ def handle_shooting(keys):
 
             if len(ammo_pickups) == 0:
 
-                from entities.pickup import Pickup
-
-                gs.pickups.append(
-                    Pickup(gs.player_x, gs.player_y - 30, "ammo")
+                request_spawn_pickup(
+                    gs.player_x,
+                    gs.player_y - 30,
+                    "ammo",
+                    priority=999,
+                    force=True   # 🔥 ESSA É A CHAVE
                 )
 
             # cooldown antes de poder spawnar outro
             gs.ammo_starve_timer = -60
 
-    elif gs.ammo > 2:
+    else:
         gs.ammo_starve_timer = 0
 
 
@@ -3386,7 +3809,6 @@ def update_player():
 ./systems/rage_system.py
 ================================================================================
 
-import math
 import random
 
 from core import game_state as gs
@@ -3394,13 +3816,9 @@ from core import game_state as gs
 from systems.particles import spawn_hit_particles
 from entities.pickup import Pickup
 
-from systems.collisions import kill_enemy
-
-from systems.run_logger import (
-    log_rage_trigger,
-    log_rage_kill
-)
-
+from systems.run_logger import log_rage_trigger
+from systems.damage_system import request_damage
+from systems.pickups import request_spawn_pickup
 
 def trigger_rage_explosion(x, y):
 
@@ -3408,6 +3826,7 @@ def trigger_rage_explosion(x, y):
         return
 
     radius = max(gs.rage_radius, 40)
+    radius_sq = radius * radius
     damage = gs.rage_damage
 
     # -------------------------------------------------
@@ -3427,39 +3846,34 @@ def trigger_rage_explosion(x, y):
         dx = enemy.x - x
         dy = enemy.y - y
 
-        dist = math.sqrt(dx*dx + dy*dy)
+        dist_sq = dx*dx + dy*dy
 
-        if dist < radius:
+        if dist_sq < radius_sq:
 
-            enemy.hp -= damage
+            # =================================================
+            # DAMAGE (PIPELINE CORRETO)
+            # =================================================
 
-            if enemy.hp <= 0:
+            request_damage(enemy, damage, source="rage")
 
-                log_rage_kill()
+            ex = enemy.x
+            ey = enemy.y
 
-                ex = enemy.x
-                ey = enemy.y
+            # -------------------------------------------------
+            # AMMO DROP
+            # -------------------------------------------------
 
-                # usa sistema central de morte
-                kill_enemy(enemy)
+            if gs.rage_ammo:
+                if random.random() < 0.4:
+                    request_spawn_pickup(ex, ey, "ammo", priority=2)
 
-                # -------------------------------------------------
-                # AMMO DROP
-                # -------------------------------------------------
+            # -------------------------------------------------
+            # CHAIN EXPLOSION
+            # -------------------------------------------------
 
-                if gs.rage_ammo:
-
-                    if random.random() < 0.4:
-                        gs.pickups.append(Pickup(ex, ey, "ammo"))
-
-                # -------------------------------------------------
-                # CHAIN EXPLOSION
-                # -------------------------------------------------
-
-                if gs.rage_chain:
-
-                    if random.random() < 0.35:
-                        trigger_rage_explosion(ex, ey)
+            if gs.rage_chain:
+                if random.random() < 0.35:
+                    trigger_rage_explosion(ex, ey)
 
 
 ================================================================================
@@ -3800,6 +4214,20 @@ def update_run_director():
             return
 
         load_event()
+
+# =========================================================
+# END RUN (CENTRAL AUTHORITY)
+# =========================================================
+
+def request_end_run(reason):
+
+    from systems.run_logger import end_run
+    from systems.nemesis_system import finalize_run
+
+    end_run(reason)
+    finalize_run()
+
+    gs.game_state = "result"
 
 
 ================================================================================
@@ -4405,9 +4833,8 @@ def give_run_reward():
 ================================================================================
 
 from core import game_state as gs
-
+import systems.run_director as run_director
 from systems.collisions import player_enemy_collision
-from systems.run_ender import end_current_run
 
 
 def update_run_state():
@@ -4416,16 +4843,14 @@ def update_run_state():
     # PLAYER MORREU
     # -------------------------------------------------
 
-    if player_enemy_collision():
-        end_current_run("enemy_collision")
-        return True
+    player_enemy_collision()
 
     # -------------------------------------------------
     # WORLD MORREU
     # -------------------------------------------------
 
     if gs.world_integrity <= 0:
-        end_current_run("world_destroyed")
+        run_director.request_end_run("world_destroyed")
         return True
 
     return False
@@ -5269,7 +5694,6 @@ WEAPONS = {
 ================================================================================
 
 from core import game_state as gs
-from ui import spawn_message
 
 def apply_world_damage(amount):
 
@@ -5304,12 +5728,11 @@ def update_world_integrity():
 
     if ratio < 0.30 and not hasattr(gs, "world_critical_warning"):
 
-        spawn_message(
-            "WORLD CRITICAL",
-            250,
-            500,
-            (255,80,80)
-        )
+        gs.pending_feedback.append({
+            "type": "world_critical",
+            "x": 250,
+            "y": 500
+        })
 
         gs.world_critical_warning = True
 
@@ -5598,7 +6021,8 @@ import math
 import random
 
 from core import game_state as gs
-
+from systems.kill_system import request_kill
+from systems.damage_system import request_damage
 
 # =========================================================
 # BASE ENEMY
@@ -5643,9 +6067,16 @@ class NormalEnemy:
         self.invulnerable = True
 
         # IMPACTO VISUAL
-        gs.hit_stop = 10
-        gs.screen_shake = 20
-        gs.screen_shake_power = 6
+        gs.pending_feedback.append({
+            "type": "hit_stop",
+            "duration": 10
+        })
+
+        gs.pending_feedback.append({
+            "type": "shake",
+            "duration": 20,
+            "power": 6
+        })
 
 
     # =========================================================
@@ -5682,8 +6113,7 @@ class NormalEnemy:
                         continue
 
                     if abs(e.x - self.x) < 30 and abs(e.y - self.y) < 30:
-                        e.hp = 0  # explode
-
+                        request_damage(e, 999, source="golden_collision")
 
         else:
             # comportamento normal

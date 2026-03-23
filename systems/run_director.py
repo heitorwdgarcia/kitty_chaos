@@ -286,3 +286,17 @@ def update_run_director():
             return
 
         load_event()
+
+# =========================================================
+# END RUN (CENTRAL AUTHORITY)
+# =========================================================
+
+def request_end_run(reason):
+
+    from systems.run_logger import end_run
+    from systems.nemesis_system import finalize_run
+
+    end_run(reason)
+    finalize_run()
+
+    gs.game_state = "result"

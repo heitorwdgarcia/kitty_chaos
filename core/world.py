@@ -24,13 +24,16 @@ class World:
         self.bullets = []
         self.particles = []
         self.pickups = []
+        
+        # ---------------- PICKUP SYSTEM ----------------
 
+        self.pending_pickups = []
         # ---------------- WEAPON ----------------
 
         self.weapon = "pistol"
 
         # ---------------- AMMO ----------------
-
+        
         self.ammo = 5
         self.max_ammo = 5
 
@@ -170,6 +173,10 @@ class World:
         # ---------------- UI ----------------
 
         self.messages = []
+        
+        # ---------------- FEEDBACK SYSTEM ----------------
+        
+        self.pending_feedback = []
 
         # ---------------- PLAYER STATS ----------------
 
@@ -187,6 +194,10 @@ class World:
         # ---------------- SAFETY ----------------
 
         self.ammo_starve_timer = 0
+        
+        # ---------------- DROP CONTROL ----------------
+
+        self.ammo_spawned_this_frame = 0
 
         # ---------------- RUN PROGRESSION ----------------
 

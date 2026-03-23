@@ -1,10 +1,10 @@
 from core import game_state as gs
 from settings import *
-from ui import spawn_message
 
 from systems.rage_system import trigger_rage_explosion
 from systems.run_logger import log_near_miss, log_world_damage
 from systems.world_integrity import apply_world_damage
+from systems.damage_system import request_damage
 
 def update_dodge():
 
@@ -29,12 +29,11 @@ def update_dodge():
                 if gs.near_miss_ammo:
                     gs.ammo = min(gs.ammo + 1, gs.max_ammo)
 
-                spawn_message(
-                    "NEAR MISS",
-                    enemy.x,
-                    enemy.y,
-                    (255,220,120)
-                )
+                gs.pending_feedback.append({
+                    "type": "near_miss",
+                    "x": enemy.x,
+                    "y": enemy.y
+                })
 
                 if gs.rage_level > 0:
 
@@ -52,5 +51,8 @@ def update_dodge():
 
                 gs.world_leak_counter += 1
 
-            if enemy in gs.enemies:
-                gs.enemies.remove(enemy)
+
+            if getattr(enemy, "is_dead", False):
+                continue
+            
+            request_damage(enemy, 999, source="event_dodge", damage_type="execution")

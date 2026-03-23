@@ -1,11 +1,11 @@
 import random
 
-from entities.pickup import Pickup
 from core import game_state as gs
+from systems.pickups import request_spawn_pickup
 
 
 # =========================================================
-# ENEMY DROP SYSTEM
+# ENEMY DROP SYSTEM (AGORA SÓ FAZ REQUEST)
 # =========================================================
 
 def enemy_drop(enemy):
@@ -13,50 +13,46 @@ def enemy_drop(enemy):
     x = enemy.x
     y = enemy.y
 
-    ammo_chance = 0.18 + gs.ammo_drop_bonus
+    # -------------------------------------------------
+    # CONFIG
+    # -------------------------------------------------
+
     gem_chance = 0.08
+    ammo_chance = 0.12  # 🔥 NOVO: estabilidade básica de ammo
 
     # -------------------------------------------------
-    # DURANTE BOSS FIGHT → mais ammo
-    # -------------------------------------------------
-
-    if gs.boss:
-        ammo_chance = 0.30
-
-    # -------------------------------------------------
-    # MINIBOSS DROP (sempre dropa)
+    # MINIBOSS DROP (SEMPRE DROP)
     # -------------------------------------------------
 
     if getattr(enemy, "is_miniboss", False):
 
-        # gem garantida
-        gs.pickups.append(Pickup(x, y, "gem"))
+        request_spawn_pickup(x, y, "gem", priority=1)
+        request_spawn_pickup(x + 12, y, "ammo", priority=4)
 
-        # ammo garantida
-        gs.pickups.append(Pickup(x + 12, y, "ammo"))
-
-        # double pickups upgrade
-        if gs.double_pickups:
-
-            gs.pickups.append(Pickup(x + 6, y, "gem"))
-            gs.pickups.append(Pickup(x + 18, y, "ammo"))
+        if getattr(gs, "double_pickups", False):
+            request_spawn_pickup(x + 6, y, "gem", priority=1)
+            request_spawn_pickup(x + 18, y, "ammo", priority=4)
 
         return
 
     # -------------------------------------------------
-    # NORMAL ENEMY DROPS
+    # GEM DROP (MANTÉM RNG SIMPLES)
+    # -------------------------------------------------
+
+    if random.random() < gem_chance:
+
+        request_spawn_pickup(x + 8, y, "gem", priority=1)
+
+        if getattr(gs, "double_pickups", False):
+            request_spawn_pickup(x + 14, y, "gem", priority=1)
+
+    # -------------------------------------------------
+    # AMMO DROP (NOVO - LEVE)
     # -------------------------------------------------
 
     if random.random() < ammo_chance:
 
-        gs.pickups.append(Pickup(x, y, "ammo"))
+        request_spawn_pickup(x + 10, y, "ammo", priority=2)
 
-        if gs.double_pickups:
-            gs.pickups.append(Pickup(x + 6, y, "ammo"))
-
-    if random.random() < gem_chance:
-
-        gs.pickups.append(Pickup(x + 8, y, "gem"))
-
-        if gs.double_pickups:
-            gs.pickups.append(Pickup(x + 14, y, "gem"))
+        if getattr(gs, "double_pickups", False):
+            request_spawn_pickup(x + 16, y, "ammo", priority=2)

@@ -1,0 +1,105 @@
+==============================
+RUN STATISTICS
+==============================
+Total runs: 2
+Average run time: 69.28s
+Average kills: 44.50
+
+==============================
+COMBAT
+==============================
+Hit rate: 80.3%
+Total shots: 254
+Total hits: 204
+
+==============================
+RAGE SYSTEM
+==============================
+Rage explosions: 0
+Rage kills: 0
+
+==============================
+DODGE SKILL
+==============================
+Total near misses: 3
+Near misses per run: 1.50
+
+==============================
+DEATH REASONS
+==============================
+enemy_collision: 2
+
+==============================
+RUN PROGRESSION
+==============================
+Reached Stage 6: 2 runs (100.0%)
+
+==============================
+DEATH BY STAGE
+==============================
+Died at Stage 5: 2 runs (100.0%)
+
+==============================
+DEATH EVENTS
+==============================
+CombatEvent: 2 runs (100.0%)
+
+==============================
+STAGE BALANCE
+==============================
+
+Stage 0
+  avg time: 15.00s
+  avg kills: 6.00
+  avg enemies alive: 1.73
+  kills per second: 0.40
+
+Stage 1
+  avg time: 15.00s
+  avg kills: 12.00
+  avg enemies alive: 2.68
+  kills per second: 0.80
+
+Stage 2
+  avg time: 15.00s
+  avg kills: 13.50
+  avg enemies alive: 3.92
+  kills per second: 0.90
+
+Stage 3
+  avg time: 5.35s
+  avg kills: 0.50
+  avg enemies alive: 2.55
+  kills per second: 0.09
+
+Stage 4
+  avg time: 15.00s
+  avg kills: 9.50
+  avg enemies alive: 3.18
+  kills per second: 0.63
+
+Stage 5
+  avg time: 3.92s
+  avg kills: 3.00
+  avg enemies alive: 2.76
+  kills per second: 0.77
+
+==============================
+UPGRADES CHOSEN
+==============================
+pistol_double: 2
+pistol_pierce: 2
+pistol_rapid: 1
+ammo_pickup: 1
+
+==============================
+UPGRADE PICK RATE
+==============================
+pistol_double: 100.0% pick rate (2/2)
+ammo_capacity: 0.0% pick rate (0/3)
+ammo_pickup: 50.0% pick rate (1/2)
+pistol_rapid: 100.0% pick rate (1/1)
+near_miss_ammo: 0.0% pick rate (0/3)
+world_regen: 0.0% pick rate (0/2)
+pistol_pierce: 100.0% pick rate (2/2)
+vitality: 0.0% pick rate (0/3)
